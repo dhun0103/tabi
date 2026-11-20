@@ -3,6 +3,7 @@ import { loadRecent } from '../lib/session'
 import { fmtDay, newId, parseTripId } from '../lib/util'
 import { repo } from '../store'
 import type { Trip } from '../types'
+import { RateField } from './RateField'
 import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
 
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
@@ -112,9 +113,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
               <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
             </Field>
           </div>
-          <Field label="환율 (100엔 = ?원)" hint="환전한 환율로 넣으세요. 나중에 설정에서 바꿀 수 있어요">
-            <input value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" placeholder="예: 950" className={inputCls} />
-          </Field>
+          <RateField value={rate} onChange={setRate} autoFill hint="환전·충전한 환율로 넣으면 원화 환산이 정확해요. 나중에 설정에서 바꿀 수 있어요" />
           <Field label="일행 (선택, 쉼표로 구분)" hint="2명 이상이면 가계부에 '누가 냈나'와 1/N 정산이 생겨요">
             <input value={members} onChange={(e) => setMembers(e.target.value)} placeholder="예: 나, 민수, 지영" className={inputCls} />
           </Field>

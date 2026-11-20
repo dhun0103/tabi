@@ -3,6 +3,7 @@ import { parseBackup, type Backup } from '../lib/backup'
 import { shareLink, todayStr } from '../lib/util'
 import { repo } from '../store'
 import type { Expense, Plan, Trip } from '../types'
+import { RateField } from './RateField'
 import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
 
 const isTouch = () => matchMedia('(pointer: coarse)').matches
@@ -118,9 +119,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
             <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
           </Field>
         </div>
-        <Field label="환율 (100엔 = ?원)" hint="실제로 환전한 환율이나 카드 환율로 넣으면 원화 환산이 정확해져요">
-          <input value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" className={inputCls} />
-        </Field>
+        <RateField value={rate} onChange={setRate} needsSave hint="실제로 환전·충전한 환율이나 카드 환율로 넣으면 원화 환산이 정확해져요" />
         <div>
           <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">일행 (가계부 정산에 사용)</span>
           <div className="flex flex-wrap gap-1.5">
@@ -210,7 +209,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
         <p>
           <b className="text-neutral-700">안드로이드</b> 크롬 메뉴(⋮) → 홈 화면에 추가
         </p>
-        <p className="pt-2 text-xs text-neutral-400">지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim)</p>
+        <p className="pt-2 text-xs text-neutral-400">지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim) · 환율 Frankfurter (유럽중앙은행 기준값)</p>
       </section>
 
       <Band />

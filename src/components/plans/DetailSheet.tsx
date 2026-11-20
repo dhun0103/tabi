@@ -4,7 +4,6 @@ import { googlePlaceInfo, useGoogleEnabled, type PlaceInfo } from '../../lib/goo
 import { categoryOf, fmtDay, fmtKRW, fmtMoney, mondayIndex, toKRW } from '../../lib/util'
 import type { Expense, Plan } from '../../types'
 import { CategoryIcon } from '../icons'
-import { MapView } from '../map/MapView'
 import { BLUE, MINT, Sheet, btnOutline, btnPrimary } from '../ui'
 
 interface Props {
@@ -21,9 +20,12 @@ interface Props {
 }
 
 /**
- * 장소 상세 (트리플 장소 화면 순서)
- *   이름·종류 → 작은 지도 → 회색 정보 상자(주소·전화·홈페이지) → [구글맵][길찾기]
- *   → 이용가능시간 ⌄ → 메모 → 이 장소에서 쓴 돈
+ * 장소 상세 (트리플 장소 화면 순서, 그림 없이 가볍게)
+ *   이름 · 번호·날짜·시간 · 평점·종류·동네
+ *   → 회색 정보 상자(주소·전화·홈페이지) → [구글맵][길찾기]
+ *   → 이용가능시간 ⌄ → 메모 → 이 장소에서 쓴 돈 → 일정 수정
+ * 지도·사진은 넣지 않는다: 위치는 일정 화면 위 지도와 [구글맵] 버튼으로 보고,
+ * 구글 키를 넣은 뒤에도 상세를 열 때마다 지도·사진 요청이 나가지 않게
  */
 export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
   const google = useGoogleEnabled()
@@ -56,66 +58,48 @@ export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onA
   const hoursText = hoursLine?.split(/:\s(.+)/)[1] ?? hoursLine
   const total = expenses.reduce((a, e) => a + toKRW(e.amount, e.currency, rate), 0)
   const meta = [plan.kind, plan.area].filter(Boolean).join(' · ')
-  const address = info?.address || plan.area
+  const when = [dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')
 
-  return (
-    <Sheet
-      title={plan.title}
-      onClose={onClose}
-      headerAction={
-        <button type="button" onClick={onEdit} className="px-2 py-2 text-[14px] font-medium text-neutral-500">
-          수정
-        </button>
-      }
-    >
-      <div className="-mt-3">
-        <p className="flex items-center gap-1.5 text-[13px] text-neutral-500">
-          {number > 0 && (
-            <span
-              className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
-              style={pinned ? { background: color.bg, color: color.ink } : { background: '#e5e5e5', color: '#737373' }}
-            >
-              {number}
+  const subtitle = (
+    <>
+      <p className="flex items-center gap-1.5 text-[13px] leading-5 text-neutral-500">
+        {number > 0 && (
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+            style={pinned ? { background: color.bg, color: color.ink } : { background: '#e5e5e5', color: '#737373' }}
+          >
+            {number}
+          </span>
+        )}
+        {when}
+      </p>
+      {(meta || info?.rating != null) && (
+        <p className="mt-1 text-sm text-neutral-500">
+          {info?.rating != null && (
+            <span className="mr-1.5 font-semibold text-neutral-800">
+              <span className="text-[#FFB800]">★</span> {info.rating.toFixed(1)}
+              {info.ratingCount != null && <span className="ml-0.5 font-normal text-neutral-400">({info.ratingCount.toLocaleString('ko-KR')})</span>}
+              {meta && <span className="mx-1 text-neutral-300">·</span>}
             </span>
           )}
-          {[dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')}
+          {meta}
         </p>
-        {(meta || info?.rating != null) && (
-          <p className="mt-1.5 text-sm text-neutral-500">
-            {info?.rating != null && (
-              <span className="mr-1.5 font-semibold text-neutral-800">
-                <span className="text-[#FFB800]">★</span> {info.rating.toFixed(1)}
-                {info.ratingCount != null && <span className="ml-0.5 font-normal text-neutral-400">({info.ratingCount.toLocaleString('ko-KR')})</span>}
-                <span className="mx-1 text-neutral-300">·</span>
-              </span>
-            )}
-            {meta}
-          </p>
-        )}
-      </div>
-
-      {/* 작은 지도: 누르면 구글맵으로 (사진 대신. 사진은 열 때마다 요금이 따로 나가서 안 불러온다) */}
-      {pinned && (
-        <div className="relative h-40 overflow-hidden rounded-xl">
-          <MapView
-            className="h-full w-full bg-neutral-100"
-            pins={[{ id: plan.id, lat: plan.lat, lng: plan.lng, label: number > 0 ? String(number) : '', title: plan.title, color: color.bg, ink: color.ink }]}
-          />
-          {placeUrl && (
-            <a href={placeUrl} target="_blank" rel="noopener noreferrer" aria-label="구글맵에서 크게 보기" className="absolute inset-0 z-10" />
-          )}
-        </div>
       )}
+    </>
+  )
 
-      {(address || info?.phone || info?.website) && (
+  return (
+    <Sheet title={plan.title} subtitle={subtitle} onClose={onClose}>
+      {/* 구글 장소일 때만: 동네는 제목 아래에 이미 있으니 상자는 정확한 주소·전화·홈페이지만 */}
+      {info && (info.address || info.phone || info.website) && (
         <dl className="space-y-2.5 rounded-xl bg-[#F5F5F5] px-4 py-3.5 text-[14px]">
-          {address && <InfoRow label="주소">{address}</InfoRow>}
-          {info?.phone && (
+          {info.address && <InfoRow label="주소">{info.address}</InfoRow>}
+          {info.phone && (
             <InfoRow label="전화">
               <a href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
             </InfoRow>
           )}
-          {info?.website && (
+          {info.website && (
             <InfoRow label="홈페이지">
               <a href={info.website} target="_blank" rel="noopener noreferrer" className="break-all">
                 {info.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
@@ -215,9 +199,26 @@ export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onA
         </button>
       </section>
 
-      {google && !plan.placeId && (
-        <p className="text-xs leading-relaxed text-neutral-400">수정 → 장소 변경에서 구글로 다시 검색해 넣으면 평점·영업시간·전화가 나와요.</p>
-      )}
+      {/* 날짜·시간·장소·메모 바꾸기 / 삭제는 수정 화면에서 */}
+      <section className="border-t border-neutral-100 pt-4">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#F3F3F3] py-3 text-[14px] font-semibold text-neutral-700 active:bg-neutral-200"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 20h4L19 9l-4-4L4 16v4z" />
+            <path d="M14 6l4 4" />
+          </svg>
+          일정 수정
+        </button>
+        {google && !plan.placeId && (
+          <p className="mt-2 text-xs leading-relaxed text-neutral-400">
+            일정 수정 → 장소 변경에서 구글로 다시 검색해 넣으면 평점·영업시간·전화가 나와요.
+          </p>
+        )}
+      </section>
+
       {info && <p className="text-right text-[11px] text-neutral-400">Google Maps</p>}
     </Sheet>
   )

@@ -1,12 +1,19 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
-/* 연한 회색 바탕 + 흰 카드, 검정 버튼. 색은 날짜(Day)별 핀 색에만 쓴다 */
+/*
+ * 트리플 톤: 흰 카드 + 파란 버튼(선택된 Day·주요 버튼), 회색 알약 칩, 민트 아이콘
+ * 색 값은 아래 상수 하나로 모아 둔다
+ */
+export const BLUE = '#2F87F2' // 주요 버튼·선택 상태 (흰 글자 대비 3.6:1, 굵은 글자용)
+export const MINT = '#0E9A90' // 가계부 카테고리 아이콘 (흰 바탕 대비 3.4:1)
 
 export const cardCls = 'rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)]'
 export const inputCls =
-  'w-full rounded-xl bg-neutral-100 px-3.5 py-3 text-base text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-white focus:ring-2 focus:ring-neutral-900'
+  'w-full rounded-xl bg-neutral-100 px-3.5 py-3 text-base text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-white focus:ring-2 focus:ring-[#2F87F2]'
 export const btnPrimary =
-  'w-full rounded-xl bg-neutral-900 px-4 py-3.5 text-[15px] font-semibold text-white active:bg-neutral-700 disabled:opacity-30'
+  'w-full rounded-xl bg-[#2F87F2] px-4 py-3.5 text-[15px] font-semibold text-white active:bg-[#2370D0] disabled:opacity-30'
+export const btnOutline =
+  'w-full rounded-xl border border-neutral-300 bg-white px-4 py-3.5 text-[15px] font-semibold text-neutral-700 active:bg-neutral-50'
 export const btnGhost =
   'inline-flex items-center justify-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-neutral-600 shadow-sm ring-1 ring-neutral-200 active:bg-neutral-100'
 export const btnDanger = 'shrink-0 rounded-xl px-4 py-3.5 text-[15px] font-medium text-red-600 active:bg-red-50'
@@ -20,9 +27,9 @@ export function Card(props: { children: ReactNode; className?: string }) {
   return <section className={`${cardCls} mx-4 ${props.className ?? ''}`}>{props.children}</section>
 }
 
-/** 화면 아래에서 올라오는 입력 창 */
-export function Sheet(props: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {
-  const { title, onClose, children, footer } = props
+/** 화면 아래에서 올라오는 창 (headerAction: 제목 옆 작은 글자 버튼, 예: 수정) */
+export function Sheet(props: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode; headerAction?: ReactNode }) {
+  const { title, onClose, children, footer, headerAction } = props
   const closeRef = useRef(onClose)
   useEffect(() => {
     closeRef.current = onClose
@@ -48,11 +55,14 @@ export function Sheet(props: { title: string; onClose: () => void; children: Rea
         className="relative flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white"
       >
         <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-neutral-200" aria-hidden="true" />
-        <div className="flex items-center justify-between px-5 pb-1 pt-2">
-          <h2 className="text-[17px] font-bold">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="닫기" className="-mr-2 p-2 text-lg leading-none text-neutral-400">
-            ✕
-          </button>
+        <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-2">
+          <h2 className="min-w-0 truncate text-[18px] font-bold">{title}</h2>
+          <div className="-mr-2 flex shrink-0 items-center">
+            {headerAction}
+            <button type="button" onClick={onClose} aria-label="닫기" className="p-2 text-lg leading-none text-neutral-400">
+              ✕
+            </button>
+          </div>
         </div>
         <div className="flex-1 space-y-5 overflow-y-auto px-5 pb-5 pt-2">{children}</div>
         {footer && (
@@ -86,6 +96,7 @@ export function Group(props: { label: string; children: ReactNode }) {
   )
 }
 
+/** 회색 알약 칩, 고르면 파랑 */
 export function Chip(props: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
@@ -93,7 +104,7 @@ export function Chip(props: { active: boolean; onClick: () => void; children: Re
       aria-pressed={props.active}
       onClick={props.onClick}
       className={`shrink-0 rounded-full px-3.5 py-2 text-sm transition-colors ${
-        props.active ? 'bg-neutral-900 font-medium text-white' : 'bg-neutral-100 text-neutral-600 active:bg-neutral-200'
+        props.active ? 'bg-[#2F87F2] font-semibold text-white' : 'bg-[#F3F3F3] text-neutral-600 active:bg-neutral-200'
       }`}
     >
       {props.children}
@@ -108,7 +119,7 @@ export function Fab(props: { label: string; onClick: () => void }) {
       type="button"
       onClick={props.onClick}
       aria-label={props.label}
-      className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-neutral-900 text-white shadow-lg shadow-black/20 active:scale-95"
+      className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#2F87F2] text-white shadow-lg shadow-black/20 active:scale-95"
       style={{ right: 'max(16px, calc(50vw - 256px + 16px))', bottom: 'calc(76px + env(safe-area-inset-bottom))' }}
     >
       <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">

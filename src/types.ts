@@ -22,7 +22,7 @@ export interface Plan {
   order: number // 같은 날 안의 순서 (작을수록 위)
   title: string // 장소 이름 (memo면 메모 내용)
   place: string // 구글맵 검색어
-  placeId: string // 구글 장소 ID (있으면 사진·평점을 불러오고 구글맵이 정확히 그 장소로 열림)
+  placeId: string // 구글 장소 ID (있으면 평점·영업시간을 불러오고 구글맵이 정확히 그 장소로 열림)
   mapUrl: string // 구글맵 공유 링크 (예전 데이터 호환용)
   memo: string
   done: boolean

@@ -16,9 +16,9 @@ import {
 import type { Expense, Plan, Trip } from '../types'
 import { ExpenseSheet } from './expenses/ExpenseSheet'
 import { CategoryIcon } from './icons'
-import { Sheet, cardCls } from './ui'
+import { BLUE, MINT, Sheet, cardCls } from './ui'
 
-const ACCENT = '#2a78d6' // 금액 강조·막대 (날짜 1일차 색과 같은 파랑)
+const ACCENT = BLUE // 금액 강조·막대 (트리플 파랑)
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
 type SheetState = { kind: 'edit'; expense: Expense | null; date?: string } | { kind: 'settle' } | { kind: 'stats' } | null
@@ -140,8 +140,8 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
                   return (
                     <li key={e.id}>
                       <button type="button" onClick={() => setSheet({ kind: 'edit', expense: e })} className="flex w-full items-center gap-3 py-3.5 text-left">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
-                          <CategoryIcon category={e.category} className="h-[18px] w-[18px]" />
+                        <span className="flex h-9 w-7 shrink-0 items-center justify-center" style={{ color: MINT }}>
+                          <CategoryIcon category={e.category} className="h-[20px] w-[20px]" />
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-[15px] font-semibold">{e.title || place || c.label}</span>
@@ -264,7 +264,9 @@ function StatsSheet({ expenses, rate, onClose }: { expenses: Expense[]; rate: nu
             <li key={c.id}>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="flex items-center gap-2 text-neutral-700">
-                  <CategoryIcon category={c.id} className="h-4 w-4" />
+                  <span style={{ color: MINT }}>
+                    <CategoryIcon category={c.id} className="h-4 w-4" />
+                  </span>
                   {c.label}
                 </span>
                 <span className="tabular-nums text-neutral-900">

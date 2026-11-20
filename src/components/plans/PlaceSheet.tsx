@@ -240,7 +240,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
                 autoFocus={!initial}
               />
               {!google && (
-                <button type="submit" disabled={busy} className="shrink-0 rounded-xl bg-neutral-900 px-4 text-sm font-semibold text-white disabled:opacity-40">
+                <button type="submit" disabled={busy} className="shrink-0 rounded-xl bg-[#2F87F2] px-4 text-sm font-semibold text-white disabled:opacity-40">
                   검색
                 </button>
               )}
@@ -298,7 +298,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
           <>
             <MapView
               className="mt-2 h-52 w-full overflow-hidden rounded-xl bg-neutral-100"
-              pins={spot ? [{ id: 'spot', lat: spot.lat, lng: spot.lng, label: '', title: spot.name, color: '#171717', ink: '#ffffff' }] : []}
+              pins={spot ? [{ id: 'spot', lat: spot.lat, lng: spot.lng, label: '', title: spot.name, color: '#2F87F2', ink: '#ffffff' }] : []}
               fallbackCenter={spot ?? centerOf(near)}
               onMapClick={pickOnMap}
             />

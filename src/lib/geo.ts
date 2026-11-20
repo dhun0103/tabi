@@ -1,17 +1,18 @@
 import type { Plan } from '../types'
 
 /* ───────── 날짜별 색 (지도 핀·동선·타임라인 번호) ─────────
- * dataviz 기본 팔레트 순서 그대로 (색약 구분 검증된 순서). 9일차부터는 회색.
- * ink: 핀 안 숫자 색 (밝은 색 위엔 검정, 어두운 색 위엔 흰색) */
+ * 트리플 핀 색(보라·코랄·민트)으로 시작하는 8색. 색약 구분·밝기는 dataviz 검사기로 통과한 순서
+ * (이웃한 날끼리 CVD ΔE ≥ 9.3). 9일차부터는 회색.
+ * ink: 핀 안 숫자 색 (밝은 민트·주황 위엔 검정, 나머지는 흰색) */
 const DAY_COLORS = [
-  { bg: '#2a78d6', ink: '#ffffff' }, // blue
-  { bg: '#eb6834', ink: '#ffffff' }, // orange
-  { bg: '#1baf7a', ink: '#0b0b0b' }, // aqua
-  { bg: '#eda100', ink: '#0b0b0b' }, // yellow
-  { bg: '#e87ba4', ink: '#0b0b0b' }, // magenta
-  { bg: '#008300', ink: '#ffffff' }, // green
-  { bg: '#6250d6', ink: '#ffffff' }, // violet
-  { bg: '#e34948', ink: '#ffffff' }, // red
+  { bg: '#945DF7', ink: '#ffffff' }, // purple
+  { bg: '#F26365', ink: '#ffffff' }, // coral
+  { bg: '#1FBFB2', ink: '#0b0b0b' }, // mint
+  { bg: '#E07B00', ink: '#0b0b0b' }, // orange
+  { bg: '#3592F8', ink: '#ffffff' }, // blue
+  { bg: '#D9449B', ink: '#ffffff' }, // magenta
+  { bg: '#2E9E4F', ink: '#ffffff' }, // green
+  { bg: '#7A6BD8', ink: '#ffffff' }, // indigo
 ]
 export const NEUTRAL_COLOR = { bg: '#52514e', ink: '#ffffff' }
 export const dayColor = (index: number) => DAY_COLORS[index] ?? NEUTRAL_COLOR

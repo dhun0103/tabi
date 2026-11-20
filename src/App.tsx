@@ -117,7 +117,7 @@ function Header({ trip, online }: { trip: Trip; online: boolean }) {
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-[18px] font-extrabold leading-tight tracking-tight">
             <span className="truncate">{trip.name}</span>
-            {dday && <span className="shrink-0 rounded-full bg-neutral-900 px-2 py-0.5 text-[11px] font-semibold text-white">{dday}</span>}
+            {dday && <span className="shrink-0 rounded-full bg-[#2F87F2] px-2 py-0.5 text-[11px] font-semibold text-white">{dday}</span>}
           </h1>
           <p className="text-xs text-neutral-400">
             {fmtDay(trip.startDate)} – {fmtDay(trip.endDate)} · {length}

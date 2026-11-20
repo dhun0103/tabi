@@ -109,11 +109,12 @@ export async function googleResolve(s: GoogleSuggestion): Promise<PlaceResult> {
   }
 }
 
-/* ───────── 장소 상세 (사진·평점·영업시간) ───────── */
+/* ───────── 장소 상세 (평점·영업시간·전화) ─────────
+ * 사진은 일부러 안 불러온다: 사진은 한 장 보여줄 때마다 따로 요금이 매겨지는 항목(월 무료 1,000건)이라
+ * 상세를 열 때마다 한도를 쓴다. 아래 정보는 장소 하나당 한 번만 요청하고 앱이 켜져 있는 동안 다시 쓴다.
+ */
 
 export interface PlaceInfo {
-  photoUrl: string | null
-  photoBy: { name: string; uri: string | null } | null
   rating: number | null
   ratingCount: number | null
   hours: string[] // 월요일부터 7줄
@@ -131,13 +132,9 @@ export function googlePlaceInfo(placeId: string): Promise<PlaceInfo> {
     const { Place } = await gmaps('places')
     const place = new Place({ id: placeId, requestedLanguage: 'ko' })
     await place.fetchFields({
-      fields: ['photos', 'rating', 'userRatingCount', 'regularOpeningHours', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber'],
+      fields: ['rating', 'userRatingCount', 'regularOpeningHours', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber'],
     })
-    const photo = place.photos?.[0]
-    const by = photo?.authorAttributions?.[0]
     return {
-      photoUrl: photo ? photo.getURI({ maxWidth: 800, maxHeight: 600 }) : null,
-      photoBy: by ? { name: by.displayName, uri: by.uri } : null,
       rating: place.rating ?? null,
       ratingCount: place.userRatingCount ?? null,
       hours: place.regularOpeningHours?.weekdayDescriptions ?? [],

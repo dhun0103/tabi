@@ -100,7 +100,7 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     const active = p.id === activeId
     // 첫 줄 위쪽 선은 앞에 메모가 있을 때만, 아래쪽 선은 뒤에 뭔가 있을 때만
     rows.push(
-      <li key={p.id} id={`plan-${p.id}`} className={`-mx-4 flex px-4 transition-colors ${active ? 'bg-[#eaf0f8]' : ''}`}>
+      <li key={p.id} id={`plan-${p.id}`} className={`-mx-4 flex px-4 transition-colors ${active ? 'bg-[#ECF4FF]' : ''}`}>
         <Rail top={!first} bottom={!last}>
           <button
             type="button"

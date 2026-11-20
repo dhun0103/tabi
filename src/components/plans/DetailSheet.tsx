@@ -3,8 +3,9 @@ import { googleDirectionsUrl, googlePlaceUrl, hasCoords } from '../../lib/geo'
 import { googlePlaceInfo, useGoogleEnabled, type PlaceInfo } from '../../lib/google'
 import { categoryOf, fmtDay, fmtKRW, fmtMoney, mondayIndex, toKRW } from '../../lib/util'
 import type { Expense, Plan } from '../../types'
-import { KindIcon } from '../icons'
-import { Sheet } from '../ui'
+import { CategoryIcon } from '../icons'
+import { MapView } from '../map/MapView'
+import { BLUE, MINT, Sheet, btnOutline, btnPrimary } from '../ui'
 
 interface Props {
   plan: Plan
@@ -20,161 +21,183 @@ interface Props {
 }
 
 /**
- * 장소 상세: 위에 사진(구글 장소일 때) → 이름·종류 → 버튼 4개(길찾기·구글맵·지출·수정)
- * → 영업시간·주소 → 메모 → 이 장소에서 쓴 돈
+ * 장소 상세 (트리플 장소 화면 순서)
+ *   이름·종류 → 작은 지도 → 회색 정보 상자(주소·전화·홈페이지) → [구글맵][길찾기]
+ *   → 이용가능시간 ⌄ → 메모 → 이 장소에서 쓴 돈
  */
 export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
   const google = useGoogleEnabled()
-  const [info, setInfo] = useState<PlaceInfo | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState<{ placeId: string; info: PlaceInfo } | null>(null)
   const [allHours, setAllHours] = useState(false)
 
   useEffect(() => {
     if (!google || !plan.placeId) return
+    const placeId = plan.placeId
     let alive = true
-    setLoading(true)
-    googlePlaceInfo(plan.placeId)
-      .then((i) => alive && setInfo(i))
+    googlePlaceInfo(placeId)
+      .then((info) => {
+        if (alive) setLoaded({ placeId, info })
+      })
       .catch(() => {})
-      .finally(() => alive && setLoading(false))
     return () => {
       alive = false
     }
   }, [plan.placeId, google])
 
+  // 열어 둔 사이 일행이 장소를 바꾸면(실시간 동기화) 이전 장소의 평점·영업시간은 버린다
+  const info = google && loaded?.placeId === plan.placeId ? loaded.info : null
+
+  const pinned = hasCoords(plan)
   const placeUrl = googlePlaceUrl(plan)
   const dirUrl = googleDirectionsUrl(plan)
   // 영업시간은 "그 일정 날짜"의 요일 기준 (날짜 미정이면 오늘)
   const dayIdx = mondayIndex(plan.date)
   const hoursLine = info?.hours[dayIdx]
+  const hoursText = hoursLine?.split(/:\s(.+)/)[1] ?? hoursLine
   const total = expenses.reduce((a, e) => a + toKRW(e.amount, e.currency, rate), 0)
   const meta = [plan.kind, plan.area].filter(Boolean).join(' · ')
+  const address = info?.address || plan.area
 
   return (
-    <Sheet title={plan.title} onClose={onClose}>
-      {loading && !info && <div className="h-44 animate-pulse rounded-2xl bg-neutral-100" />}
-      {info?.photoUrl && (
-        <figure>
-          <img src={info.photoUrl} alt={plan.title} className="h-48 w-full rounded-2xl object-cover" />
-          {info.photoBy && (
-            <figcaption className="mt-1 text-right text-[11px] text-neutral-400">
-              사진{' '}
-              {info.photoBy.uri ? (
-                <a href={info.photoBy.uri} target="_blank" rel="noopener noreferrer" className="underline">
-                  {info.photoBy.name}
-                </a>
-              ) : (
-                info.photoBy.name
-              )}
-            </figcaption>
+    <Sheet
+      title={plan.title}
+      onClose={onClose}
+      headerAction={
+        <button type="button" onClick={onEdit} className="px-2 py-2 text-[14px] font-medium text-neutral-500">
+          수정
+        </button>
+      }
+    >
+      <div className="-mt-3">
+        <p className="flex items-center gap-1.5 text-[13px] text-neutral-500">
+          {number > 0 && (
+            <span
+              className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
+              style={pinned ? { background: color.bg, color: color.ink } : { background: '#e5e5e5', color: '#737373' }}
+            >
+              {number}
+            </span>
           )}
-        </figure>
-      )}
-
-      <div className="flex items-start gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-neutral-100 text-neutral-500">
-          <KindIcon kind={plan.kind} className="h-6 w-6" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[13px] text-neutral-500">
-            {number > 0 && (
-              <span
-                className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-bold"
-                style={hasCoords(plan) ? { background: color.bg, color: color.ink } : { background: '#e5e5e5', color: '#737373' }}
-              >
-                {number}
+          {[dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')}
+        </p>
+        {(meta || info?.rating != null) && (
+          <p className="mt-1.5 text-sm text-neutral-500">
+            {info?.rating != null && (
+              <span className="mr-1.5 font-semibold text-neutral-800">
+                <span className="text-[#FFB800]">★</span> {info.rating.toFixed(1)}
+                {info.ratingCount != null && <span className="ml-0.5 font-normal text-neutral-400">({info.ratingCount.toLocaleString('ko-KR')})</span>}
+                <span className="mx-1 text-neutral-300">·</span>
               </span>
             )}
-            {[dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')}
+            {meta}
           </p>
-          {(meta || info?.rating != null) && (
-            <p className="mt-1 text-sm text-neutral-600">
-              {info?.rating != null && (
-                <span className="mr-2 font-semibold text-neutral-900">
-                  ★ {info.rating.toFixed(1)}
-                  {info.ratingCount != null && <span className="ml-1 font-normal text-neutral-400">({info.ratingCount.toLocaleString('ko-KR')})</span>}
-                </span>
-              )}
-              {meta}
-            </p>
+        )}
+      </div>
+
+      {/* 작은 지도: 누르면 구글맵으로 (사진 대신. 사진은 열 때마다 요금이 따로 나가서 안 불러온다) */}
+      {pinned && (
+        <div className="relative h-40 overflow-hidden rounded-xl">
+          <MapView
+            className="h-full w-full bg-neutral-100"
+            pins={[{ id: plan.id, lat: plan.lat, lng: plan.lng, label: number > 0 ? String(number) : '', title: plan.title, color: color.bg, ink: color.ink }]}
+          />
+          {placeUrl && (
+            <a href={placeUrl} target="_blank" rel="noopener noreferrer" aria-label="구글맵에서 크게 보기" className="absolute inset-0 z-10" />
           )}
         </div>
-      </div>
+      )}
 
-      {/* 자주 쓰는 동작 4개 */}
-      <div className="grid grid-cols-4 gap-2">
-        <Action href={dirUrl} label="길찾기" primary>
-          <path d="M3 11l18-8-8 18-2-8-8-2z" />
-        </Action>
-        <Action href={placeUrl} label="구글맵">
-          <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
-          <circle cx="12" cy="10" r="2.3" />
-        </Action>
-        <Action onClick={onAddExpense} label="지출 추가">
-          <rect x="3" y="6" width="18" height="13" rx="2.5" />
-          <path d="M3 10h18M15 15h3" />
-        </Action>
-        <Action onClick={onEdit} label="수정">
-          <path d="M4 20h4L19 9l-4-4L4 16v4z" />
-        </Action>
-      </div>
-
-      {info && (hoursLine || info.address || info.phone || info.website) && (
-        <ul className="space-y-2.5 rounded-2xl bg-neutral-50 p-4 text-sm text-neutral-700">
-          {hoursLine && (
-            <Row icon="🕘">
-              <button type="button" onClick={() => setAllHours((v) => !v)} className="text-left">
-                {hoursLine} <span className="text-xs text-neutral-400">{allHours ? '접기' : '요일별'}</span>
-              </button>
-              {allHours && (
-                <ul className="mt-1.5 space-y-0.5 text-[13px] text-neutral-500">
-                  {info.hours.map((h, i) => (
-                    <li key={h} className={i === dayIdx ? 'font-semibold text-neutral-800' : ''}>
-                      {h}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Row>
+      {(address || info?.phone || info?.website) && (
+        <dl className="space-y-2.5 rounded-xl bg-[#F5F5F5] px-4 py-3.5 text-[14px]">
+          {address && <InfoRow label="주소">{address}</InfoRow>}
+          {info?.phone && (
+            <InfoRow label="전화">
+              <a href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
+            </InfoRow>
           )}
-          {info.address && <Row icon="📍">{info.address}</Row>}
-          {info.phone && (
-            <Row icon="📞">
-              <a href={`tel:${info.phone.replace(/\s/g, '')}`} className="underline underline-offset-2">
-                {info.phone}
-              </a>
-            </Row>
-          )}
-          {info.website && (
-            <Row icon="🔗">
-              <a href={info.website} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">
+          {info?.website && (
+            <InfoRow label="홈페이지">
+              <a href={info.website} target="_blank" rel="noopener noreferrer" className="break-all">
                 {info.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
               </a>
-            </Row>
+            </InfoRow>
           )}
-        </ul>
+        </dl>
+      )}
+
+      <div className="grid grid-cols-[1fr_1.4fr] gap-2">
+        {placeUrl ? (
+          <a href={placeUrl} target="_blank" rel="noopener noreferrer" className={`${btnOutline} text-center`}>
+            구글맵
+          </a>
+        ) : (
+          <span className={`${btnOutline} text-center opacity-30`}>구글맵</span>
+        )}
+        {dirUrl ? (
+          <a href={dirUrl} target="_blank" rel="noopener noreferrer" className={`${btnPrimary} text-center`}>
+            길찾기
+          </a>
+        ) : (
+          <span className={`${btnPrimary} text-center opacity-30`}>길찾기</span>
+        )}
+      </div>
+
+      {info && info.hours.length > 0 && (
+        <section className="border-t border-neutral-100 pt-4">
+          <button type="button" onClick={() => setAllHours((v) => !v)} className="flex w-full items-center justify-between text-left">
+            <span className="text-[15px] font-semibold text-neutral-800">이용가능시간, 휴무일</span>
+            <svg
+              viewBox="0 0 24 24"
+              className={`h-5 w-5 text-neutral-500 transition-transform ${allHours ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {hoursText && (
+            <p className="mt-1.5 text-[15px] font-semibold" style={{ color: BLUE }}>
+              {plan.date ? fmtDay(plan.date) : '오늘'} <span className="ml-1">{hoursText}</span>
+            </p>
+          )}
+          {allHours && (
+            <ul className="mt-2 space-y-1 text-[13px] text-neutral-500">
+              {info.hours.map((h, i) => (
+                <li key={h} className={i === dayIdx ? 'font-semibold text-neutral-800' : ''}>
+                  {h}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       {plan.memo && (
-        <div className="rounded-2xl bg-neutral-50 p-4 text-sm leading-relaxed">
-          <p className="mb-1 text-[13px] font-semibold text-neutral-900">메모</p>
-          <p className="whitespace-pre-wrap text-neutral-700">{plan.memo}</p>
-        </div>
+        <section className="border-t border-neutral-100 pt-4">
+          <p className="text-[15px] font-semibold text-neutral-800">메모</p>
+          <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-relaxed text-neutral-600">{plan.memo}</p>
+        </section>
       )}
 
-      <section>
+      <section className="border-t border-neutral-100 pt-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-[15px] font-bold">이 장소에서 쓴 돈</h3>
+          <h3 className="text-[15px] font-semibold text-neutral-800">이 장소에서 쓴 돈</h3>
           {expenses.length > 0 && <span className="text-[15px] font-bold tabular-nums">{fmtKRW(total)}</span>}
         </div>
-        {expenses.length > 0 ? (
-          <ul className="mt-2 divide-y divide-neutral-100 rounded-2xl border border-neutral-200 px-4">
+        {expenses.length > 0 && (
+          <ul className="mt-1 divide-y divide-neutral-100">
             {expenses.map((e) => {
               const c = categoryOf(e.category)
               return (
                 <li key={e.id}>
-                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2.5 py-3 text-left text-sm">
-                    <span aria-hidden="true">{c.emoji}</span>
+                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2.5 py-3 text-left text-[14px]">
+                    <span style={{ color: MINT }}>
+                      <CategoryIcon category={e.category} className="h-[18px] w-[18px]" />
+                    </span>
                     <span className="min-w-0 flex-1 truncate text-neutral-700">{e.title || c.label}</span>
                     <span className="font-semibold tabular-nums">{fmtMoney(e.amount, e.currency)}</span>
                   </button>
@@ -182,63 +205,29 @@ export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onA
               )
             })}
           </ul>
-        ) : (
-          <button
-            type="button"
-            onClick={onAddExpense}
-            className="mt-2 w-full rounded-2xl border border-dashed border-neutral-300 py-3.5 text-sm font-medium text-neutral-500 active:bg-neutral-50"
-          >
-            여기서 쓴 돈을 기록해 보세요
-          </button>
         )}
+        <button
+          type="button"
+          onClick={onAddExpense}
+          className="mt-2 w-full rounded-xl border border-neutral-300 py-3 text-[14px] font-semibold text-neutral-700 active:bg-neutral-50"
+        >
+          + 지출 추가
+        </button>
       </section>
 
       {google && !plan.placeId && (
-        <p className="text-xs leading-relaxed text-neutral-400">수정 → 장소 변경에서 구글로 다시 검색해 넣으면 사진·평점·영업시간이 나와요.</p>
+        <p className="text-xs leading-relaxed text-neutral-400">수정 → 장소 변경에서 구글로 다시 검색해 넣으면 평점·영업시간·전화가 나와요.</p>
       )}
       {info && <p className="text-right text-[11px] text-neutral-400">Google Maps</p>}
     </Sheet>
   )
 }
 
-/** 아이콘 + 글자 버튼 (링크 또는 버튼) */
-function Action(props: { label: string; href?: string | null; onClick?: () => void; primary?: boolean; children: ReactNode }) {
-  const cls = `flex flex-col items-center gap-1 rounded-2xl py-3 text-[12px] font-semibold ${
-    props.primary ? 'bg-neutral-900 text-white active:bg-neutral-700' : 'bg-neutral-100 text-neutral-700 active:bg-neutral-200'
-  }`
-  const icon = (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {props.children}
-    </svg>
-  )
-  if (props.href !== undefined) {
-    return props.href ? (
-      <a href={props.href} target="_blank" rel="noopener noreferrer" className={cls}>
-        {icon}
-        {props.label}
-      </a>
-    ) : (
-      <span className={`${cls} opacity-30`} aria-disabled="true">
-        {icon}
-        {props.label}
-      </span>
-    )
-  }
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <button type="button" onClick={props.onClick} className={cls}>
-      {icon}
-      {props.label}
-    </button>
-  )
-}
-
-function Row({ icon, children }: { icon: string; children: ReactNode }) {
-  return (
-    <li className="flex gap-2.5">
-      <span className="w-5 shrink-0 text-center" aria-hidden="true">
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">{children}</div>
-    </li>
+    <div className="flex gap-3">
+      <dt className="w-14 shrink-0 font-semibold text-neutral-800">{label}</dt>
+      <dd className="min-w-0 flex-1 text-neutral-600">{children}</dd>
+    </div>
   )
 }

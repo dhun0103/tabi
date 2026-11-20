@@ -6,7 +6,7 @@ import { repo } from '../../store'
 import type { Expense, Plan, Trip } from '../../types'
 import { ExpenseSheet } from '../expenses/ExpenseSheet'
 import { MapView, type MapPin, type MapRoute } from '../map/MapView'
-import { Empty, btnGhost, cardCls, reportError } from '../ui'
+import { BLUE, Empty, btnGhost, cardCls, reportError } from '../ui'
 import { DetailSheet } from './DetailSheet'
 import { MemoSheet } from './MemoSheet'
 import { PlaceSheet } from './PlaceSheet'
@@ -113,9 +113,9 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   const dayLabelOf = (p: Plan) => (isUndated(p) ? '날짜 미정' : `Day ${days.indexOf(p.date) + 1} · ${fmtDay(p.date)}`)
 
   const tabs = [
-    { key: ALL, label: '전체', bg: '#171717', ink: '#ffffff' },
-    ...days.map((d, i) => ({ key: d, label: `Day ${i + 1}`, bg: dayColor(i).bg, ink: dayColor(i).ink })),
-    { key: UNDATED, label: '미정', bg: NEUTRAL_COLOR.bg, ink: NEUTRAL_COLOR.ink },
+    { key: ALL, label: '전체' },
+    ...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })),
+    { key: UNDATED, label: '미정' },
   ]
   const addDate = view === ALL ? (days[0] ?? UNDATED) : view
   const undatedCount = itemsOf(UNDATED).length
@@ -155,7 +155,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
                 className={`shrink-0 rounded-full px-4 py-2 text-[14px] font-bold transition-colors ${
                   active ? 'shadow-sm' : 'bg-white text-neutral-500 ring-1 ring-neutral-200 active:bg-neutral-50'
                 }`}
-                style={active ? { background: t.bg, color: t.ink } : undefined}
+                style={active ? { background: BLUE, color: '#ffffff' } : undefined}
               >
                 {t.label}
               </button>
@@ -173,6 +173,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
                 <section key={d} className="pb-2 pt-3">
                   <button type="button" onClick={() => setPicked(d)} className="flex w-full items-baseline justify-between pb-2 text-left">
                     <span>
+                      <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-[1px]" style={{ background: dayColor(i).bg }} aria-hidden="true" />
                       <span className="text-[16px] font-bold">Day {i + 1}</span>
                       <span className="ml-1.5 text-[14px] text-neutral-400">{fmtDay(d)}</span>
                     </span>

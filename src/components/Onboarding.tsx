@@ -54,7 +54,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
   }
 
   return (
-    <div className="min-h-dvh bg-white text-neutral-900">
+    <div className="min-h-dvh bg-[#f4f5f8] text-neutral-900">
       <div className="mx-auto max-w-lg pb-12" style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
         <header className="px-5 pb-6 pt-6">
           <img src="/logo.svg" alt="" className="h-11 w-11" />
@@ -80,7 +80,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
 
         {recent.length > 0 && (
           <>
-            <section className="px-5 pb-5">
+            <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 px-5 pb-3 pt-4">
               <h2 className={sectionTitle}>최근 여행</h2>
               <ul className="mt-2 divide-y divide-neutral-100">
                 {recent.map((t) => (
@@ -99,7 +99,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
           </>
         )}
 
-        <section className="space-y-5 px-5 py-6">
+        <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 space-y-5 p-5">
           <h2 className={sectionTitle}>새 여행 만들기</h2>
           <Field label="여행 이름">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 나고야 여행" className={inputCls} />
@@ -127,7 +127,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
         {repo.mode === 'cloud' && (
           <>
             <Band />
-            <section className="space-y-3 px-5 py-6">
+            <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 space-y-3 p-5">
               <h2 className={sectionTitle}>공유 링크로 참여</h2>
               <p className="text-sm text-neutral-500">일행에게 받은 링크를 붙여넣으세요.</p>
               <input

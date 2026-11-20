@@ -105,7 +105,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
 
   return (
     <div>
-      <section className="space-y-5 px-5 py-5">
+      <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 mt-4 space-y-5 p-5">
         <h3 className={sectionTitle}>여행 정보</h3>
         <Field label="여행 이름">
           <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} />
@@ -159,7 +159,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       </section>
 
       <Band />
-      <section className="space-y-3 px-5 py-5">
+      <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 space-y-3 p-5">
         <h3 className={sectionTitle}>일행 초대</h3>
         {repo.mode === 'cloud' ? (
           <>
@@ -177,7 +177,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       </section>
 
       <Band />
-      <section className="space-y-3 px-5 py-5">
+      <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 space-y-3 p-5">
         <h3 className={sectionTitle}>백업</h3>
         <p className="text-sm text-neutral-500">일정과 가계부를 파일 하나로 저장하거나 다시 불러와요.</p>
         <div className="flex gap-2">
@@ -202,7 +202,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       </section>
 
       <Band />
-      <section className="space-y-1.5 px-5 py-5 text-sm text-neutral-500">
+      <section className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 space-y-1.5 p-5 text-sm text-neutral-500">
         <h3 className={`${sectionTitle} mb-2`}>홈 화면에 앱으로 추가</h3>
         <p>
           <b className="text-neutral-700">아이폰</b> 사파리 공유 버튼 → 홈 화면에 추가
@@ -214,7 +214,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       </section>
 
       <Band />
-      <button type="button" onClick={onLeave} className="w-full py-5 text-sm font-medium text-neutral-500 active:bg-neutral-50">
+      <button type="button" onClick={onLeave} className="rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)] mx-4 mb-4 block w-[calc(100%-2rem)] py-4 text-sm font-medium text-neutral-500 active:bg-neutral-50">
         다른 여행 보기 · 새 여행 만들기
       </button>
     </div>

@@ -83,11 +83,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-dvh bg-white text-neutral-900">
+    <div className="min-h-dvh bg-[#f4f5f8] text-neutral-900">
       <Header trip={trip} online={online} />
       <main className="mx-auto max-w-lg" style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom))' }}>
-        {tab === 'plans' && <PlansTab trip={trip} plans={plans} />}
-        {tab === 'expenses' && <ExpensesTab trip={trip} expenses={expenses} />}
+        {tab === 'plans' && <PlansTab trip={trip} plans={plans} expenses={expenses} />}
+        {tab === 'expenses' && <ExpensesTab trip={trip} expenses={expenses} plans={plans} />}
         {tab === 'settings' && <SettingsTab key={trip.id} trip={trip} plans={plans} expenses={expenses} onLeave={leave} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
@@ -96,7 +96,7 @@ export default function App() {
 }
 
 function Center({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-dvh flex-col items-center justify-center bg-white px-6 text-center">{children}</div>
+  return <div className="flex min-h-dvh flex-col items-center justify-center bg-[#f4f5f8] px-6 text-center">{children}</div>
 }
 
 function Header({ trip, online }: { trip: Trip; online: boolean }) {
@@ -112,10 +112,10 @@ function Header({ trip, online }: { trip: Trip; online: boolean }) {
 
   // 높이 56px 고정 (일정 탭의 날짜 줄이 이 아래에 붙는다)
   return (
-    <header className="sticky top-0 z-30 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className="sticky top-0 z-30 border-b border-neutral-200/60 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-3 px-4">
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-[17px] font-bold leading-tight">
+          <h1 className="flex items-center gap-2 text-[18px] font-extrabold leading-tight tracking-tight">
             <span className="truncate">{trip.name}</span>
             {dday && <span className="shrink-0 rounded-full bg-neutral-900 px-2 py-0.5 text-[11px] font-semibold text-white">{dday}</span>}
           </h1>

@@ -89,6 +89,12 @@ export function googleDirectionsUrl(p: Plan): string | null {
   return dest ? `${base}&destination=${encodeURIComponent(dest)}` : null
 }
 
+/** 두 장소 사이 길찾기 (가까우면 도보, 멀면 대중교통) */
+export function googleLegUrl(a: LatLng, b: LatLng): string {
+  const mode = distanceM(a, b) <= 1500 ? 'walking' : 'transit'
+  return `https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}&travelmode=${mode}`
+}
+
 /** 하루 동선: 장소들을 순서대로 이은 경로 */
 export function googleRouteUrl(plans: Plan[]): string | null {
   const stops = plans

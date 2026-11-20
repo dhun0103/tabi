@@ -66,6 +66,7 @@ export function normalizeExpense(x: unknown): Expense | null {
     payer: str(o.payer),
     shared: o.shared !== false,
     memo: str(o.memo),
+    planId: str(o.planId),
     createdAt: num(o.createdAt, now),
     updatedAt: num(o.updatedAt, now),
   }

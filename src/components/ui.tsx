@@ -1,18 +1,24 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
-/* 흑백 위주 심플 톤: 흰 배경, 회색 입력칸, 검정 버튼, 섹션은 얇은 회색 띠로 구분 */
+/* 연한 회색 바탕 + 흰 카드, 검정 버튼. 색은 날짜(Day)별 핀 색에만 쓴다 */
 
+export const cardCls = 'rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)]'
 export const inputCls =
   'w-full rounded-xl bg-neutral-100 px-3.5 py-3 text-base text-neutral-900 outline-none placeholder:text-neutral-400 focus:bg-white focus:ring-2 focus:ring-neutral-900'
 export const btnPrimary =
   'w-full rounded-xl bg-neutral-900 px-4 py-3.5 text-[15px] font-semibold text-white active:bg-neutral-700 disabled:opacity-30'
 export const btnGhost =
-  'inline-flex items-center justify-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 active:bg-neutral-100'
+  'inline-flex items-center justify-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-neutral-600 shadow-sm ring-1 ring-neutral-200 active:bg-neutral-100'
 export const btnDanger = 'shrink-0 rounded-xl px-4 py-3.5 text-[15px] font-medium text-red-600 active:bg-red-50'
 export const sectionTitle = 'text-[15px] font-bold text-neutral-900'
 
-/** 섹션 사이 회색 띠 */
-export const Band = () => <div className="h-2 bg-neutral-100" />
+/** 섹션 사이 간격 (카드 사이) */
+export const Band = () => <div className="h-3" />
+
+/** 흰 카드 섹션 */
+export function Card(props: { children: ReactNode; className?: string }) {
+  return <section className={`${cardCls} mx-4 ${props.className ?? ''}`}>{props.children}</section>
+}
 
 /** 화면 아래에서 올라오는 입력 창 */
 export function Sheet(props: { title: string; onClose: () => void; children: ReactNode; footer?: ReactNode }) {

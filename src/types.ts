@@ -45,6 +45,7 @@ export interface Expense {
   payer: string
   shared: boolean // true = 일행이 1/N, false = 개인 지출
   memo: string
+  planId: string // 일정의 어느 장소에서 쓴 돈인지 ('' = 연결 안 함)
   createdAt: number
   updatedAt: number
 }

@@ -1,0 +1,93 @@
+import type { ReactNode } from 'react'
+
+/** 장소 종류별 아이콘 (사진이 없을 때 썸네일 자리에 쓰는 선 아이콘) */
+type Kind = 'food' | 'cafe' | 'shopping' | 'lodging' | 'transport' | 'sights' | 'place'
+
+export function kindIcon(kind: string): Kind {
+  if (/카페|커피|디저트|베이커리|빵/.test(kind)) return 'cafe'
+  if (/음식|식당|레스토랑|맛집|라멘|라면|스시|초밥|우동|소바|돈카츠|이자카야|술집|바$|펍/.test(kind)) return 'food'
+  if (/쇼핑|백화점|마트|상점|매장|편의점|시장|몰|아웃렛|기념품/.test(kind)) return 'shopping'
+  if (/호텔|숙소|료칸|게스트|호스텔|리조트|민박/.test(kind)) return 'lodging'
+  if (/역|공항|터미널|정류장|교통|버스|지하철|항구/.test(kind)) return 'transport'
+  if (/관광|명소|박물관|미술관|공원|성$|사원|절|신사|테마파크|동물원|수족관|전망|온천|유적/.test(kind)) return 'sights'
+  return 'place'
+}
+
+const PATHS: Record<Kind, ReactNode> = {
+  food: (
+    <>
+      <path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8a2 2 0 0 1-2 2M9 3v6" />
+      <path d="M17 21V3c-1.7 0-3 2.2-3 5v5h3" />
+    </>
+  ),
+  cafe: (
+    <>
+      <path d="M4 9h12v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" />
+      <path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3" />
+    </>
+  ),
+  shopping: (
+    <>
+      <path d="M5 8h14l-1 12H6L5 8z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </>
+  ),
+  lodging: (
+    <>
+      <path d="M3 19V6M21 19v-6a3 3 0 0 0-3-3h-8v6M3 16h18" />
+      <circle cx="6.5" cy="11.5" r="1.8" />
+    </>
+  ),
+  transport: (
+    <>
+      <rect x="6" y="3" width="12" height="13" rx="3" />
+      <path d="M6 10h12M9 20l-2 1M15 20l2 1M9 13h.01M15 13h.01" />
+    </>
+  ),
+  sights: (
+    <>
+      <path d="M4 8h3l1.5-2h7L17 8h3v11H4V8z" />
+      <circle cx="12" cy="13" r="3.2" />
+    </>
+  ),
+  place: (
+    <>
+      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </>
+  ),
+}
+
+/** 가계부 카테고리 아이콘 */
+const CATEGORY_KIND: Record<string, Kind> = {
+  food: 'food',
+  transport: 'transport',
+  shopping: 'shopping',
+  lodging: 'lodging',
+  sights: 'sights',
+}
+
+export function CategoryIcon({ category, className = 'h-5 w-5' }: { category: string; className?: string }) {
+  const kind = CATEGORY_KIND[category]
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {kind ? (
+        PATHS[kind]
+      ) : (
+        // 기타: 영수증
+        <>
+          <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z" />
+          <path d="M9 8h6M9 12h6" />
+        </>
+      )}
+    </svg>
+  )
+}
+
+export function KindIcon({ kind, className = 'h-5 w-5' }: { kind: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {PATHS[kindIcon(kind)]}
+    </svg>
+  )
+}

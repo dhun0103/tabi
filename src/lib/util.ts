@@ -94,6 +94,16 @@ export const CATEGORIES: { id: Category; label: string; emoji: string }[] = [
 ]
 export const categoryOf = (id: Category) => CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[5]
 
+/** 일정 장소의 종류(관광명소, 음식점 …)로 지출 카테고리 추측 */
+export function categoryFromKind(kind: string): Category {
+  if (/음식|식당|레스토랑|맛집|라멘|라면|스시|초밥|우동|소바|돈카츠|이자카야|카페|커피|베이커리|빵|디저트|술집|바$|펍/.test(kind)) return 'food'
+  if (/쇼핑|백화점|마트|상점|매장|편의점|시장|몰|아웃렛|기념품/.test(kind)) return 'shopping'
+  if (/호텔|숙소|료칸|게스트|호스텔|리조트|민박/.test(kind)) return 'lodging'
+  if (/역|공항|터미널|정류장|교통|버스|지하철|항구/.test(kind)) return 'transport'
+  if (/관광|명소|박물관|미술관|공원|성$|사원|절|신사|테마파크|동물원|수족관|전망|온천|유적/.test(kind)) return 'sights'
+  return 'etc'
+}
+
 export const METHODS: { id: PayMethod; label: string }[] = [
   { id: 'cash', label: '현금' },
   { id: 'card', label: '카드' },

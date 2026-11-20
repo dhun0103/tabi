@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// 로그인 없이 "링크를 아는 사람만" 쓰는 구조
+// - 여행 ID(공유 링크 안의 20자 랜덤 문자열)를 알아야만 읽기/쓰기 가능
+// - 전체 여행 목록 조회(list)와 여행 삭제는 막음
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /trips/{tripId} {
+      allow get, create, update: if tripId.size() >= 20;
+      allow list, delete: if false;
+
+      match /plans/{planId} {
+        allow read, write: if tripId.size() >= 20;
+      }
+      match /expenses/{expenseId} {
+        allow read, write: if tripId.size() >= 20;
+      }
+    }
+  }
+}

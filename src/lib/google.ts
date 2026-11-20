@@ -1,0 +1,152 @@
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader'
+import { useEffect, useReducer } from 'react'
+import { boundsOf, type LatLng, type PlaceResult } from './geo'
+
+/**
+ * 구글 지도·장소 API
+ * - .env.local 에 VITE_GOOGLE_MAPS_API_KEY 가 있으면 사용, 없으면 앱은 무료 지도/검색으로 동작
+ * - 키가 틀렸거나 API가 꺼져 있으면 구글이 gm_authFailure 를 불러준다 → 무료 지도로 자동 전환
+ */
+
+const KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+export const GOOGLE_MAP_ID = import.meta.env.VITE_GOOGLE_MAP_ID || 'DEMO_MAP_ID'
+
+let failed = false
+let configured = false
+const listeners = new Set<() => void>()
+
+export const googleEnabled = () => Boolean(KEY) && !failed
+
+export function markGoogleFailed() {
+  if (failed) return
+  failed = true
+  listeners.forEach((fn) => fn())
+}
+
+/** 구글 사용 가능 여부가 바뀌면 다시 그리기 */
+export function useGoogleEnabled(): boolean {
+  const [, rerender] = useReducer((x: number) => x + 1, 0)
+  useEffect(() => {
+    listeners.add(rerender)
+    return () => {
+      listeners.delete(rerender)
+    }
+  }, [])
+  return googleEnabled()
+}
+
+export async function gmaps<K extends keyof google.maps.ImportLibraryMap>(name: K): Promise<google.maps.ImportLibraryMap[K]> {
+  if (!KEY || failed) throw new Error('구글 지도를 쓸 수 없어요')
+  if (!configured) {
+    configured = true
+    // 지도 글자는 한국어, 국경·지명 표기는 한국 기준
+    setOptions({ key: KEY, v: 'weekly', language: 'ko', region: 'KR' })
+    ;(window as unknown as { gm_authFailure?: () => void }).gm_authFailure = markGoogleFailed
+  }
+  try {
+    return await importLibrary(name)
+  } catch (e) {
+    markGoogleFailed()
+    throw e
+  }
+}
+
+/* ───────── 장소 검색 (입력하는 동안 자동완성) ───────── */
+
+export interface GoogleSuggestion {
+  placeId: string
+  main: string
+  secondary: string
+  prediction: google.maps.places.PlacePrediction
+}
+
+export async function newSearchSession(): Promise<google.maps.places.AutocompleteSessionToken> {
+  const { AutocompleteSessionToken } = await gmaps('places')
+  return new AutocompleteSessionToken()
+}
+
+export async function googleSuggest(
+  input: string,
+  sessionToken: google.maps.places.AutocompleteSessionToken,
+  near: LatLng[],
+): Promise<GoogleSuggestion[]> {
+  const { AutocompleteSuggestion } = await gmaps('places')
+  const request: google.maps.places.AutocompleteRequest = {
+    input,
+    sessionToken,
+    language: 'ko',
+    includedRegionCodes: ['jp'],
+  }
+  // 이미 넣은 장소 근처 결과를 먼저
+  if (near.length) request.locationBias = boundsOf(near, 0.15)
+  const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
+  return suggestions.flatMap((s) => {
+    const p = s.placePrediction
+    return p ? [{ placeId: p.placeId, main: p.mainText?.text ?? p.text.text, secondary: p.secondaryText?.text ?? '', prediction: p }] : []
+  })
+}
+
+/** 고른 후보의 위치·종류·동네를 가져온다 (검색 세션은 여기서 끝남) */
+export async function googleResolve(s: GoogleSuggestion): Promise<PlaceResult> {
+  const place = s.prediction.toPlace()
+  await place.fetchFields({ fields: ['id', 'displayName', 'location', 'primaryTypeDisplayName', 'addressComponents'] })
+  const loc = place.location
+  if (!loc) throw new Error('위치를 가져오지 못했어요')
+  const comps = place.addressComponents ?? []
+  const pick = (type: string) => comps.find((c) => c.types.includes(type))?.longText ?? ''
+  const district = pick('sublocality_level_1') || pick('ward')
+  const city = pick('locality')
+  const name = place.displayName || s.main
+  return {
+    key: place.id,
+    placeId: place.id,
+    name,
+    localName: name,
+    lat: loc.lat(),
+    lng: loc.lng(),
+    kind: place.primaryTypeDisplayName ?? '',
+    area: [district, city].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', '),
+  }
+}
+
+/* ───────── 장소 상세 (사진·평점·영업시간) ───────── */
+
+export interface PlaceInfo {
+  photoUrl: string | null
+  photoBy: { name: string; uri: string | null } | null
+  rating: number | null
+  ratingCount: number | null
+  hours: string[] // 월요일부터 7줄
+  address: string
+  website: string
+  phone: string
+}
+
+const infoCache = new Map<string, Promise<PlaceInfo>>()
+
+export function googlePlaceInfo(placeId: string): Promise<PlaceInfo> {
+  const cached = infoCache.get(placeId)
+  if (cached) return cached
+  const job = (async () => {
+    const { Place } = await gmaps('places')
+    const place = new Place({ id: placeId, requestedLanguage: 'ko' })
+    await place.fetchFields({
+      fields: ['photos', 'rating', 'userRatingCount', 'regularOpeningHours', 'formattedAddress', 'websiteURI', 'nationalPhoneNumber'],
+    })
+    const photo = place.photos?.[0]
+    const by = photo?.authorAttributions?.[0]
+    return {
+      photoUrl: photo ? photo.getURI({ maxWidth: 800, maxHeight: 600 }) : null,
+      photoBy: by ? { name: by.displayName, uri: by.uri } : null,
+      rating: place.rating ?? null,
+      ratingCount: place.userRatingCount ?? null,
+      hours: place.regularOpeningHours?.weekdayDescriptions ?? [],
+      address: place.formattedAddress ?? '',
+      website: place.websiteURI ?? '',
+      phone: place.nationalPhoneNumber ?? '',
+    }
+  })()
+  infoCache.set(placeId, job)
+  job.catch(() => infoCache.delete(placeId))
+  return job
+}

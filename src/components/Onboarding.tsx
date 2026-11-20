@@ -1,0 +1,154 @@
+import { useMemo, useState } from 'react'
+import { loadRecent } from '../lib/session'
+import { fmtDay, newId, parseTripId } from '../lib/util'
+import { repo } from '../store'
+import type { Trip } from '../types'
+import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
+
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const isStandalone = () =>
+  matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
+
+function parseMembers(s: string): string[] {
+  const list = [...new Set(s.split(/[,，、]/).map((x) => x.trim()).filter(Boolean))]
+  return list.length ? list : ['나']
+}
+
+/** 여행이 선택되지 않았을 때: 새 여행 만들기 / 링크로 참여 / 최근 여행 */
+export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
+  const recent = useMemo(loadRecent, [])
+  const [name, setName] = useState('')
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [rate, setRate] = useState('')
+  const [members, setMembers] = useState('')
+  const [link, setLink] = useState('')
+  const [error, setError] = useState('')
+  const [joinError, setJoinError] = useState('')
+
+  const create = () => {
+    const r = Number(rate)
+    if (!name.trim()) return setError('여행 이름을 적어 주세요')
+    if (!start) return setError('시작일을 골라 주세요')
+    if (end && end < start) return setError('종료일이 시작일보다 빨라요')
+    if (!(r > 0)) return setError('환율을 적어 주세요 (100엔 = ?원)')
+    const now = Date.now()
+    const trip: Trip = {
+      id: newId(),
+      name: name.trim(),
+      startDate: start,
+      endDate: end || start,
+      krwPer100Jpy: r,
+      members: parseMembers(members),
+      createdAt: now,
+      updatedAt: now,
+    }
+    repo.createTrip(trip).catch(reportError)
+    onOpen(trip.id)
+  }
+
+  const join = () => {
+    const id = parseTripId(link)
+    if (!id) return setJoinError('공유 링크를 그대로 붙여넣어 주세요')
+    onOpen(id)
+  }
+
+  return (
+    <div className="min-h-dvh bg-white text-neutral-900">
+      <div className="mx-auto max-w-lg pb-12" style={{ paddingTop: 'max(16px, env(safe-area-inset-top))' }}>
+        <header className="px-5 pb-6 pt-6">
+          <img src="/logo.svg" alt="" className="h-11 w-11" />
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight">tabi</h1>
+          <p className="mt-1 text-sm text-neutral-500">일정, 지도, 가계부를 한 곳에서 · 旅(たび) = 여행</p>
+        </header>
+
+        {(isIOS() && !isStandalone()) || repo.mode === 'local' ? (
+          <div className="mx-5 mb-6 space-y-2 rounded-xl bg-neutral-50 px-4 py-3.5 text-[13px] leading-relaxed text-neutral-600">
+            {isIOS() && !isStandalone() && (
+              <p>
+                📱 아이폰은 사파리 공유 버튼 → <b>홈 화면에 추가</b>를 먼저 하고, 홈 화면 아이콘으로 열어서 시작하세요. 사파리와
+                저장공간이 따로예요.
+              </p>
+            )}
+            {repo.mode === 'local' && (
+              <p>
+                지금은 <b>이 기기에만 저장</b>돼요. 일행과 같이 쓰려면 Firebase 연결이 필요해요.
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {recent.length > 0 && (
+          <>
+            <section className="px-5 pb-5">
+              <h2 className={sectionTitle}>최근 여행</h2>
+              <ul className="mt-2 divide-y divide-neutral-100">
+                {recent.map((t) => (
+                  <li key={t.id}>
+                    <button type="button" onClick={() => onOpen(t.id)} className="flex w-full items-center justify-between py-3.5 text-left active:bg-neutral-50">
+                      <span className="text-[15px] font-medium">{t.name}</span>
+                      <span className="text-[13px] text-neutral-400">
+                        {fmtDay(t.startDate)} – {fmtDay(t.endDate)} ›
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <Band />
+          </>
+        )}
+
+        <section className="space-y-5 px-5 py-6">
+          <h2 className={sectionTitle}>새 여행 만들기</h2>
+          <Field label="여행 이름">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 나고야 여행" className={inputCls} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="시작일">
+              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="종료일">
+              <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
+            </Field>
+          </div>
+          <Field label="환율 (100엔 = ?원)" hint="환전한 환율로 넣으세요. 나중에 설정에서 바꿀 수 있어요">
+            <input value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" placeholder="예: 950" className={inputCls} />
+          </Field>
+          <Field label="일행 (선택, 쉼표로 구분)" hint="2명 이상이면 가계부에 '누가 냈나'와 1/N 정산이 생겨요">
+            <input value={members} onChange={(e) => setMembers(e.target.value)} placeholder="예: 나, 민수, 지영" className={inputCls} />
+          </Field>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="button" onClick={create} className={btnPrimary}>
+            여행 만들기
+          </button>
+        </section>
+
+        {repo.mode === 'cloud' && (
+          <>
+            <Band />
+            <section className="space-y-3 px-5 py-6">
+              <h2 className={sectionTitle}>공유 링크로 참여</h2>
+              <p className="text-sm text-neutral-500">일행에게 받은 링크를 붙여넣으세요.</p>
+              <input
+                value={link}
+                onChange={(e) => {
+                  setLink(e.target.value)
+                  setJoinError('')
+                }}
+                placeholder="https://…/#t=…"
+                inputMode="url"
+                aria-label="공유 링크"
+                className={inputCls}
+              />
+              {joinError && <p className="text-sm text-red-600">{joinError}</p>}
+              <button type="button" onClick={join} className={btnPrimary}>
+                참여하기
+              </button>
+            </section>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

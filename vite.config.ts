@@ -37,6 +37,16 @@ export default defineConfig({
         // 한 번 본 지도 조각은 폰에 남겨서 오프라인에서도 보이게
         runtimeCaching: [
           {
+            // 프리텐다드 글꼴 조각: 한 번 받은 조각은 폰에 남겨서 오프라인에서도 같은 글꼴로
+            urlPattern: /\.woff2$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fonts',
+              expiration: { maxEntries: 120, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: /^https:\/\/cyberjapandata\.gsi\.go\.jp\/xyz\//,
             handler: 'CacheFirst',
             options: {

@@ -209,7 +209,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
         <p>
           <b className="text-neutral-700">안드로이드</b> 크롬 메뉴(⋮) → 홈 화면에 추가
         </p>
-        <p className="pt-2 text-xs text-neutral-400">지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim) · 환율 Frankfurter (유럽중앙은행 기준값)</p>
+        <p className="pt-2 text-xs text-neutral-400">지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim) · 환율 Frankfurter (유럽중앙은행 기준값) · 글꼴 Pretendard (SIL OFL)</p>
       </section>
 
       <Band />

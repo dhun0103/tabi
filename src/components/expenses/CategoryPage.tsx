@@ -3,6 +3,7 @@ import { CATEGORIES, expenseKRW, fmtKRW } from '../../lib/util'
 import type { Category, Expense, Trip } from '../../types'
 import { CategoryIcon } from '../icons'
 import { BLUE } from '../ui'
+import { PeriodSelect, type Period } from './PeriodSelect'
 
 /**
  * 카테고리 색 (원그래프 칸 · 아이콘 · 오른쪽 작은 막대). 색은 순위가 아니라 카테고리를 따라감 → 기간을 바꿔도 같은 색
@@ -17,32 +18,6 @@ const COLOR: Record<Category, string> = {
   transport: '#2F87F2',
   sights: '#0E9A90',
   etc: '#B0B8C1',
-}
-
-export interface Period {
-  value: string
-  label: string
-}
-
-/** 가계부와 이 페이지가 같이 쓰는 기간 고르기 */
-export function PeriodSelect(props: { periods: Period[]; value: string; onChange: (v: string) => void; className?: string }) {
-  return (
-    <select
-      value={props.value}
-      onChange={(e) => props.onChange(e.target.value)}
-      aria-label="기간"
-      className={
-        props.className ??
-        'rounded-lg bg-white py-2 pl-3 pr-8 text-[13px] font-semibold text-neutral-700 shadow-sm ring-1 ring-neutral-200 outline-none'
-      }
-    >
-      {props.periods.map((p) => (
-        <option key={p.value} value={p.value}>
-          {p.label}
-        </option>
-      ))}
-    </select>
-  )
 }
 
 interface Props {
@@ -147,12 +122,7 @@ export function CategoryPage({ trip, expenses, periods, period, onPeriod, onClos
         <section className="py-6">
           <div className="flex items-center justify-between gap-3">
             <p className="text-[14px] text-neutral-500">총 지출 금액</p>
-            <PeriodSelect
-              periods={periods}
-              value={period}
-              onChange={onPeriod}
-              className="max-w-[55%] rounded-md border border-neutral-200 bg-white py-1.5 pl-2.5 pr-7 text-[13px] text-neutral-600 outline-none"
-            />
+            <PeriodSelect periods={periods} value={period} onChange={onPeriod} variant="line" align="right" />
           </div>
           <p className="mt-2 text-[30px] font-bold tracking-tight">
             <span style={{ color: BLUE }}>{fmtKRW(total).slice(0, -1)}</span>원

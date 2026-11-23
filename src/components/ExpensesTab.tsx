@@ -12,7 +12,8 @@ import {
   tripDays,
 } from '../lib/util'
 import type { Expense, Plan, Trip } from '../types'
-import { CategoryPage, PeriodSelect, type Period } from './expenses/CategoryPage'
+import { CategoryPage } from './expenses/CategoryPage'
+import { PeriodSelect, type Period } from './expenses/PeriodSelect'
 import { ExpenseSheet } from './expenses/ExpenseSheet'
 import { CategoryIcon } from './icons'
 import { MINT, cardCls } from './ui'
@@ -44,9 +45,10 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
   const itemsOf = (key: string) =>
     expenses.filter((e) => bucketOf(e) === key).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
   const visible = sections.filter((s) => (filter === 'all' ? s.key !== 'post' || itemsOf('post').length > 0 : s.key === filter))
+  // 기간 고르기: 기간 전체 · 여행 준비 · Day 1… ("여행 후"는 뺌, 여행 후 지출은 기간 전체에서 보임)
   const periods: Period[] = [
     { value: 'all', label: '기간 전체' },
-    ...sections.map((s) => ({ value: s.key, label: s.key === 'pre' || s.key === 'post' ? s.title : `${s.title} · ${s.sub}` })),
+    ...sections.filter((s) => s.key !== 'post').map((s) => ({ value: s.key, label: s.title, sub: s.key === 'pre' ? undefined : s.sub })),
   ]
 
   const scoped = filter === 'all' ? expenses : itemsOf(filter)

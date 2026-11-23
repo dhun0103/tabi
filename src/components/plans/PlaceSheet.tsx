@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
 import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type GoogleSuggestion } from '../../lib/google'
 import { orderForInsert } from '../../lib/order'
-import { dayText, fmtDay, newId, suggestTime } from '../../lib/util'
+import { dayText, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { MapView } from '../map/MapView'
@@ -26,11 +26,16 @@ interface Props {
   onClose: () => void
 }
 
-/** 장소 추가·수정: 장소 검색(구글이면 입력하는 동안 자동완성) → 고르기, 못 찾으면 지도에서 직접 찍기 */
+/**
+ * 장소 추가·수정
+ *   추가: 장소 검색(구글이면 입력하는 동안 자동완성) → 고르기, 못 찾으면 지도에서 직접 찍기
+ *   수정: 이름·시간·메모만. 장소와 날짜는 그대로 (바꾸려면 삭제하고 그 날에서 새로 추가)
+ */
 export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose }: Props) {
   const google = useGoogleEnabled()
   const near: LatLng[] = allPlans.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng }))
-  const [date, setDate] = useState(initial?.date ?? defaultDate)
+  // 날짜는 고르지 않음: 추가는 지금 보고 있는 날, 수정은 원래 날 그대로
+  const date = initial?.date ?? defaultDate
   const [time, setTime] = useState(initial?.time ?? '')
   const [title, setTitle] = useState(initial?.title ?? '')
   const [memo, setMemo] = useState(initial?.memo ?? '')
@@ -178,18 +183,17 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
   }
 
   const remove = () => {
-    if (!initial || !confirm('이 장소를 일정에서 뺄까요?')) return
+    if (!initial || !confirm('이 장소를 일정에서 뺄까요? (이 장소 사진도 같이 지워져요)')) return
     repo.deleteItem(trip.id, 'plans', initial.id).catch(reportError)
+    repo.deletePhotosOf(trip.id, initial.id).catch(() => {}) // 사진은 못 지워도 일정 삭제는 그대로
     onClose()
   }
-
-  const dateOptions = date && !days.includes(date) ? [...days, date].sort() : days
 
   return (
     <Sheet
       title={initial ? '장소 수정' : '장소 추가'}
-      // 추가할 땐 날짜를 고르지 않고 지금 보고 있는 날에 넣는다 → 어느 날인지 제목 아래에 표시
-      subtitle={initial ? undefined : <p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
+      // 날짜 칸이 없으니 어느 날인지 제목 아래에 표시
+      subtitle={<p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -206,7 +210,18 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
     >
       <div>
         <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">장소</span>
-        {spot ? (
+        {initial ? (
+          // 수정에선 장소를 못 바꿈 (바꾸려면 삭제하고 새로 추가)
+          <div className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3.5 py-3">
+            <span aria-hidden="true">📍</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-medium">{spot?.name ?? initial.title}</p>
+              <p className="truncate text-xs text-neutral-500">
+                {spot ? [spot.kind, spot.area].filter(Boolean).join(' · ') || '지도에서 찍은 위치' : '지도 위치 없음'}
+              </p>
+            </div>
+          </div>
+        ) : spot ? (
           <div className="flex items-center gap-3 rounded-xl bg-neutral-100 px-3.5 py-3">
             <span aria-hidden="true">📍</span>
             <div className="min-w-0 flex-1">
@@ -290,14 +305,16 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
               ))}
           </>
         )}
-        <button
-          type="button"
-          onClick={() => setPicking((v) => !v)}
-          className="mt-2.5 text-[13px] font-medium text-neutral-500 underline underline-offset-2"
-        >
-          {picking ? '지도 닫기' : '지도에서 직접 위치 찍기'}
-        </button>
-        {picking && (
+        {!initial && (
+          <button
+            type="button"
+            onClick={() => setPicking((v) => !v)}
+            className="mt-2.5 text-[13px] font-medium text-neutral-500 underline underline-offset-2"
+          >
+            {picking ? '지도 닫기' : '지도에서 직접 위치 찍기'}
+          </button>
+        )}
+        {picking && !initial && (
           <>
             <MapView
               className="mt-2 h-52 w-full overflow-hidden rounded-xl bg-neutral-100"
@@ -323,24 +340,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
       </Field>
       {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
 
-      {initial ? (
-        // 수정할 때만 날짜를 바꿀 수 있음 (다른 날로 옮기기)
-        <div className="grid grid-cols-[1fr_auto] gap-3">
-          <Field label="날짜">
-            <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
-              {dateOptions.map((d) => (
-                <option key={d} value={d}>
-                  {days.includes(d) ? `DAY ${days.indexOf(d) + 1} · ${fmtDay(d)}` : fmtDay(d)}
-                </option>
-              ))}
-              <option value="">날짜 미정</option>
-            </select>
-          </Field>
-          <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date, initial.id)} className="min-w-32" />
-        </div>
-      ) : (
-        <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date)} />
-      )}
+      <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date, initial?.id)} />
 
       <Field label="메모 (선택)">
         <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={3} placeholder="예약번호, 꼭 먹을 메뉴…" className={inputCls} />

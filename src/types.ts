@@ -52,5 +52,15 @@ export interface Expense {
   updatedAt: number
 }
 
+/** 장소에 붙이는 사진 (폰에서 줄여서 데이터 그대로 저장: 사진 전용 저장소 없이 무료 요금제 안에서) */
+export interface Photo {
+  id: string
+  planId: string // 어느 장소의 사진인지
+  data: string // 줄인 JPEG (data URL, 1MB 문서 한도 안쪽)
+  width: number
+  height: number
+  createdAt: number
+}
+
 export type ListName = 'plans' | 'expenses'
 export type ListItem<N extends ListName> = N extends 'plans' ? Plan : Expense

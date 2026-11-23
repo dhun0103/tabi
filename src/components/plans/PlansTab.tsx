@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NEUTRAL_COLOR, centerOf, dayColor, googleRouteUrl, hasCoords, type LatLng } from '../../lib/geo'
-import { byOrder, moveItem, optimizeRoute, reindex, sortByTime } from '../../lib/order'
-import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, todayStr, tripDays } from '../../lib/util'
+import { byOrder, moveItem, optimizeRoute, orderForInsert, reindex, sortByTime } from '../../lib/order'
+import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Plan, Trip } from '../../types'
 import { ExpenseSheet } from '../expenses/ExpenseSheet'
@@ -84,6 +84,17 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     window.setTimeout(() => setToast(''), 2200)
   }
   const save = (p: Plan) => repo.saveItem(trip.id, 'plans', p).catch(reportError)
+  // 장소 카드에서 시간·메모만 바로 고칠 때 (시간을 바꾸면 그 시간 자리로 순서도 옮김: 장소 수정 창과 같은 규칙)
+  const updatePlan = (p: Plan, changes: Pick<Partial<Plan>, 'time' | 'memo'>) => {
+    const next: Plan = { ...p, ...changes, updatedAt: Date.now() }
+    if (changes.time !== undefined && changes.time !== '' && changes.time !== p.time) {
+      next.order = orderForInsert(
+        plans.filter((x) => x.id !== p.id && x.date === p.date),
+        changes.time,
+      )
+    }
+    save(next)
+  }
   const sameOrder = (a: Plan[], b: Plan[]) => a.every((p, i) => p.id === b[i]?.id)
 
   const move = (index: number, delta: -1 | 1) => reindex(moveItem(dayList, index, delta)).forEach(save)
@@ -108,8 +119,6 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     document.getElementById(`plan-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
   const openItem = (p: Plan) => setSheet(p.type === 'memo' ? { kind: 'memo', plan: p } : { kind: 'detail', plan: p })
-  const numberOf = (p: Plan) => itemsOf(isUndated(p) ? UNDATED : p.date).filter((x) => x.type === 'place').findIndex((x) => x.id === p.id) + 1
-  const dayLabelOf = (p: Plan) => (isUndated(p) ? '날짜 미정' : `Day ${days.indexOf(p.date) + 1} · ${fmtDay(p.date)}`)
 
   const tabs = [...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })), { key: UNDATED, label: '미정' }]
   // 시트에는 항상 최신 데이터 (일행이 고쳤을 수도 있으니)
@@ -240,12 +249,12 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
       {sheet?.kind === 'detail' && sheetPlan && (
         <DetailSheet
+          tripId={trip.id}
           plan={sheetPlan}
-          number={numberOf(sheetPlan)}
-          color={colorOf(isUndated(sheetPlan) ? UNDATED : sheetPlan.date)}
-          dayLabel={dayLabelOf(sheetPlan)}
           expenses={expensesOf(sheetPlan.id)}
           rate={trip.krwPer100Jpy}
+          suggestTime={suggestTime(plans, sheetPlan.date, sheetPlan.id)}
+          onUpdate={(changes) => updatePlan(sheetPlan, changes)}
           onAddExpense={() => setSheet({ kind: 'expense', plan: sheetPlan, expense: null })}
           onOpenExpense={(e) => setSheet({ kind: 'expense', plan: sheetPlan, expense: e })}
           onEdit={() => setSheet({ kind: 'place', plan: sheetPlan })}

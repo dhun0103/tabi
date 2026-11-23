@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { orderForInsert } from '../../lib/order'
-import { dayText, fmtDay, newId } from '../../lib/util'
+import { dayText, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
@@ -8,7 +8,8 @@ import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../u
 /** 일정 사이에 끼워 넣는 메모 (예: "여기서 지하철 1일권 사기") */
 export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[]; initial: Plan | null; defaultDate: string; onClose: () => void }) {
   const { trip, days, allPlans, initial, defaultDate, onClose } = props
-  const [date, setDate] = useState(initial?.date ?? defaultDate)
+  // 날짜는 고르지 않음: 추가는 지금 보고 있는 날, 수정은 원래 날 그대로
+  const date = initial?.date ?? defaultDate
   const [text, setText] = useState(initial?.title ?? '')
   const [error, setError] = useState('')
 
@@ -51,8 +52,8 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
   return (
     <Sheet
       title={initial ? '메모 수정' : '메모 추가'}
-      // 추가할 땐 지금 보고 있는 날에 넣는다
-      subtitle={initial ? undefined : <p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
+      // 날짜 칸이 없으니 어느 날인지 제목 아래에 표시
+      subtitle={<p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -81,19 +82,6 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
         />
       </Field>
       {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
-      {initial && (
-        // 수정할 때만 다른 날로 옮길 수 있음
-        <Field label="날짜">
-          <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
-            {days.map((d, i) => (
-              <option key={d} value={d}>
-                DAY {i + 1} · {fmtDay(d)}
-              </option>
-            ))}
-            <option value="">날짜 미정</option>
-          </select>
-        </Field>
-      )}
     </Sheet>
   )
 }

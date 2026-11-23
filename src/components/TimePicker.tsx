@@ -53,7 +53,8 @@ export function TimePicker({ value, onChange, suggest = '12:00', label = '시간
   )
 }
 
-function TimeDialog(props: { start: string; hasValue: boolean; onDone: (v: string) => void; onClose: () => void }) {
+/** 시·분 바퀴 창만 (장소 카드의 시간 줄처럼 다른 모양의 칸에서 열 때) */
+export function TimeDialog(props: { start: string; hasValue: boolean; onDone: (v: string) => void; onClose: () => void }) {
   const { start, hasValue, onDone, onClose } = props
   const [h0, m0] = start.split(':')
   const [hour, setHour] = useState(HOURS.includes(h0) ? h0 : '12')

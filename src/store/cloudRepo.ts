@@ -3,15 +3,18 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   initializeFirestore,
   onSnapshot,
   persistentLocalCache,
   persistentMultipleTabManager,
+  query,
   setDoc,
   updateDoc,
+  where,
   type Firestore,
 } from 'firebase/firestore'
-import type { ListItem, ListName, Trip } from '../types'
+import type { ListItem, ListName, Photo, Trip } from '../types'
 import type { TripRepo } from './repo'
 
 /**
@@ -19,6 +22,7 @@ import type { TripRepo } from './repo'
  *   trips/{tripId}              여행 정보
  *   trips/{tripId}/plans/{id}   일정
  *   trips/{tripId}/expenses/{id} 지출
+ *   trips/{tripId}/photos/{id}  장소 사진 (줄인 JPEG, 장소별로만 받아 옴)
  *
  * persistentLocalCache: 폰 안(IndexedDB)에 사본을 둬서
  * 지하철 등에서 끊겨도 보고 입력할 수 있고, 연결되면 자동 동기화된다.
@@ -77,6 +81,27 @@ export function createCloudRepo(config: FirebaseOptions): TripRepo {
 
     deleteItem(tripId, name, id) {
       return deleteDoc(doc(db, 'trips', tripId, name, id))
+    },
+
+    watchPhotos(tripId, planId, onData, onError) {
+      return onSnapshot(
+        query(collection(db, 'trips', tripId, 'photos'), where('planId', '==', planId)),
+        (snap) => onData(snap.docs.map((d) => d.data() as Photo).sort((a, b) => a.createdAt - b.createdAt)),
+        onError,
+      )
+    },
+
+    savePhoto(tripId, photo) {
+      return setDoc(doc(db, 'trips', tripId, 'photos', photo.id), photo)
+    },
+
+    deletePhoto(tripId, id) {
+      return deleteDoc(doc(db, 'trips', tripId, 'photos', id))
+    },
+
+    async deletePhotosOf(tripId, planId) {
+      const snap = await getDocs(query(collection(db, 'trips', tripId, 'photos'), where('planId', '==', planId)))
+      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
     },
   }
 }

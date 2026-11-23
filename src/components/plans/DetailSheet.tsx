@@ -1,18 +1,20 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { googleDirectionsUrl, googlePlaceUrl, hasCoords } from '../../lib/geo'
-import { googlePlaceInfo, useGoogleEnabled, type PlaceInfo } from '../../lib/google'
-import { categoryOf, expenseKRW, fmtDay, fmtKRW, fmtMoney, mondayIndex } from '../../lib/util'
-import type { Expense, Plan } from '../../types'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { shrinkPhoto } from '../../lib/photo'
+import { categoryOf, expenseKRW, fmtKRW, fmtMoney, newId } from '../../lib/util'
+import { repo } from '../../store'
+import type { Expense, Photo, Plan } from '../../types'
 import { CategoryIcon } from '../icons'
-import { BLUE, MINT, Sheet, btnOutline, btnPrimary } from '../ui'
+import { TimeDialog } from '../TimePicker'
+import { MINT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
 
 interface Props {
+  tripId: string
   plan: Plan
-  number: number
-  color: { bg: string; ink: string }
-  dayLabel: string // 'Day 1 · 12/5(토)'
   expenses: Expense[] // 이 장소에 연결된 지출
-  rate: number // 100엔 = ?원
+  rate: number // 기본 환율 (환율이 저장 안 된 예전 지출용)
+  suggestTime: string // 시간이 없을 때 시간 창에 먼저 보여 줄 값
+  onUpdate: (changes: Pick<Partial<Plan>, 'time' | 'memo'>) => void
   onAddExpense: () => void
   onOpenExpense: (e: Expense) => void
   onEdit: () => void
@@ -20,215 +22,264 @@ interface Props {
 }
 
 /**
- * 장소 상세 (트리플 장소 화면 순서, 그림 없이 가볍게)
- *   이름 · 번호·날짜·시간 · 평점·종류·동네
- *   → 회색 정보 상자(주소·전화·홈페이지) → [구글맵][길찾기]
- *   → 이용가능시간 ⌄ → 메모 → 이 장소에서 쓴 돈 → 일정 수정
- * 지도·사진은 넣지 않는다: 위치는 일정 화면 위 지도와 [구글맵] 버튼으로 보고,
- * 구글 키를 넣은 뒤에도 상세를 열 때마다 지도·사진 요청이 나가지 않게
+ * 장소를 누르면 아래에서 올라오는 작은 카드 (NOL 일정 화면처럼)
+ *   이름 · 종류·동네
+ *   🕒 시간 (누르면 24시간 시간 창) · ≡ 메모 (누르면 바로 쓰기) · 📷 사진 · 이 장소에서 쓴 돈
+ *   [지출 추가]  ·  일정 수정·삭제
+ * 상세 보기(평점·영업시간 등)는 없음 → 구글 장소 상세 요청도 하지 않음
  */
-export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
-  const google = useGoogleEnabled()
-  const [loaded, setLoaded] = useState<{ placeId: string; info: PlaceInfo } | null>(null)
-  const [allHours, setAllHours] = useState(false)
-
-  useEffect(() => {
-    if (!google || !plan.placeId) return
-    const placeId = plan.placeId
-    let alive = true
-    googlePlaceInfo(placeId)
-      .then((info) => {
-        if (alive) setLoaded({ placeId, info })
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [plan.placeId, google])
-
-  // 열어 둔 사이 일행이 장소를 바꾸면(실시간 동기화) 이전 장소의 평점·영업시간은 버린다
-  const info = google && loaded?.placeId === plan.placeId ? loaded.info : null
-
-  const pinned = hasCoords(plan)
-  const placeUrl = googlePlaceUrl(plan)
-  const dirUrl = googleDirectionsUrl(plan)
-  // 영업시간은 "그 일정 날짜"의 요일 기준 (날짜 미정이면 오늘)
-  const dayIdx = mondayIndex(plan.date)
-  const hoursLine = info?.hours[dayIdx]
-  const hoursText = hoursLine?.split(/:\s(.+)/)[1] ?? hoursLine
+export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
+  const [timeOpen, setTimeOpen] = useState(false)
+  const [memoOpen, setMemoOpen] = useState(false)
+  const [memoText, setMemoText] = useState('')
   const total = expenses.reduce((a, e) => a + expenseKRW(e, rate), 0) // 지출마다 적을 때의 환율
   const meta = [plan.kind, plan.area].filter(Boolean).join(' · ')
-  const when = [dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')
-
-  const subtitle = (
-    <>
-      <p className="flex items-center gap-1.5 text-[13px] leading-5 text-neutral-500">
-        {number > 0 && (
-          <span
-            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-            style={pinned ? { background: color.bg, color: color.ink } : { background: '#e5e5e5', color: '#737373' }}
-          >
-            {number}
-          </span>
-        )}
-        {when}
-      </p>
-      {(meta || info?.rating != null) && (
-        <p className="mt-1 text-sm text-neutral-500">
-          {info?.rating != null && (
-            <span className="mr-1.5 font-semibold text-neutral-800">
-              <span className="text-[#FFB800]">★</span> {info.rating.toFixed(1)}
-              {info.ratingCount != null && <span className="ml-0.5 font-normal text-neutral-400">({info.ratingCount.toLocaleString('ko-KR')})</span>}
-              {meta && <span className="mx-1 text-neutral-300">·</span>}
-            </span>
-          )}
-          {meta}
-        </p>
-      )}
-    </>
-  )
 
   return (
-    <Sheet title={plan.title} subtitle={subtitle} onClose={onClose}>
-      {/* 구글 장소일 때만: 동네는 제목 아래에 이미 있으니 상자는 정확한 주소·전화·홈페이지만 */}
-      {info && (info.address || info.phone || info.website) && (
-        <dl className="space-y-2.5 rounded-xl bg-[#F5F5F5] px-4 py-3.5 text-[14px]">
-          {info.address && <InfoRow label="주소">{info.address}</InfoRow>}
-          {info.phone && (
-            <InfoRow label="전화">
-              <a href={`tel:${info.phone.replace(/\s/g, '')}`}>{info.phone}</a>
-            </InfoRow>
-          )}
-          {info.website && (
-            <InfoRow label="홈페이지">
-              <a href={info.website} target="_blank" rel="noopener noreferrer" className="break-all">
-                {info.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
-              </a>
-            </InfoRow>
-          )}
-        </dl>
-      )}
+    <Sheet title={plan.title} subtitle={meta ? <p className="text-[13px] text-neutral-500">{meta}</p> : undefined} onClose={onClose}>
+      <div className="-mt-1">
+        <Row icon={<ClockIcon />} label="시간" onClick={() => setTimeOpen(true)}>
+          {plan.time ? <span className="font-semibold tabular-nums text-neutral-900">{plan.time}</span> : <span className="text-neutral-400">시간 추가</span>}
+        </Row>
 
-      <div className="grid grid-cols-[1fr_1.4fr] gap-2">
-        {placeUrl ? (
-          <a href={placeUrl} target="_blank" rel="noopener noreferrer" className={`${btnOutline} text-center`}>
-            구글맵
-          </a>
+        {memoOpen ? (
+          <div className="py-2">
+            <textarea
+              value={memoText}
+              onChange={(e) => setMemoText(e.target.value)}
+              rows={3}
+              autoFocus
+              placeholder="예약번호, 꼭 먹을 메뉴…"
+              aria-label="메모"
+              className={inputCls}
+            />
+            <div className="mt-2 flex justify-end gap-1.5">
+              <button type="button" onClick={() => setMemoOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-neutral-500 active:bg-neutral-100">
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdate({ memo: memoText.trim() })
+                  setMemoOpen(false)
+                }}
+                className="rounded-lg bg-[#2F87F2] px-3.5 py-2 text-sm font-semibold text-white active:bg-[#2370D0]"
+              >
+                저장
+              </button>
+            </div>
+          </div>
         ) : (
-          <span className={`${btnOutline} text-center opacity-30`}>구글맵</span>
+          <Row
+            icon={<MemoIcon />}
+            label="메모"
+            onClick={() => {
+              setMemoText(plan.memo)
+              setMemoOpen(true)
+            }}
+          >
+            {plan.memo ? <span className="whitespace-pre-wrap text-neutral-700">{plan.memo}</span> : <span className="text-neutral-400">메모 추가</span>}
+          </Row>
         )}
-        {dirUrl ? (
-          <a href={dirUrl} target="_blank" rel="noopener noreferrer" className={`${btnPrimary} text-center`}>
-            길찾기
-          </a>
-        ) : (
-          <span className={`${btnPrimary} text-center opacity-30`}>길찾기</span>
-        )}
-      </div>
 
-      {info && info.hours.length > 0 && (
-        <section className="border-t border-neutral-100 pt-4">
-          <button type="button" onClick={() => setAllHours((v) => !v)} className="flex w-full items-center justify-between text-left">
-            <span className="text-[15px] font-semibold text-neutral-800">이용가능시간, 휴무일</span>
-            <svg
-              viewBox="0 0 24 24"
-              className={`h-5 w-5 text-neutral-500 transition-transform ${allHours ? 'rotate-180' : ''}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          {hoursText && (
-            <p className="mt-1.5 text-[15px] font-semibold" style={{ color: BLUE }}>
-              {plan.date ? fmtDay(plan.date) : '오늘'} <span className="ml-1">{hoursText}</span>
-            </p>
-          )}
-          {allHours && (
-            <ul className="mt-2 space-y-1 text-[13px] text-neutral-500">
-              {info.hours.map((h, i) => (
-                <li key={h} className={i === dayIdx ? 'font-semibold text-neutral-800' : ''}>
-                  {h}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+        <PlacePhotos tripId={tripId} planId={plan.id} />
 
-      {plan.memo && (
-        <section className="border-t border-neutral-100 pt-4">
-          <p className="text-[15px] font-semibold text-neutral-800">메모</p>
-          <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-relaxed text-neutral-600">{plan.memo}</p>
-        </section>
-      )}
-
-      <section className="border-t border-neutral-100 pt-4">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-[15px] font-semibold text-neutral-800">이 장소에서 쓴 돈</h3>
-          {expenses.length > 0 && <span className="text-[15px] font-bold tabular-nums">{fmtKRW(total)}</span>}
-        </div>
         {expenses.length > 0 && (
-          <ul className="mt-1 divide-y divide-neutral-100">
-            {expenses.map((e) => {
-              const c = categoryOf(e.category)
-              return (
+          <div className="py-2.5">
+            <div className="flex items-center gap-3 text-[15px]">
+              <span className="text-neutral-500">
+                <WalletIcon />
+              </span>
+              <span className="flex-1 text-neutral-700">이 장소에서 쓴 돈</span>
+              <span className="font-bold tabular-nums">{fmtKRW(total)}</span>
+            </div>
+            <ul className="mt-1 pl-8">
+              {expenses.map((e) => (
                 <li key={e.id}>
-                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2.5 py-3 text-left text-[14px]">
+                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2 py-2 text-left text-[14px] active:bg-neutral-50">
                     <span style={{ color: MINT }}>
-                      <CategoryIcon category={e.category} className="h-[18px] w-[18px]" />
+                      <CategoryIcon category={e.category} className="h-4 w-4" />
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-neutral-700">{e.title || c.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-neutral-600">{e.title || categoryOf(e.category).label}</span>
                     <span className="font-semibold tabular-nums">{fmtMoney(e.amount, e.currency)}</span>
                   </button>
                 </li>
-              )
-            })}
-          </ul>
+              ))}
+            </ul>
+          </div>
         )}
-        <button
-          type="button"
-          onClick={onAddExpense}
-          className="mt-2 w-full rounded-xl border border-neutral-300 py-3 text-[14px] font-semibold text-neutral-700 active:bg-neutral-50"
-        >
-          + 지출 추가
-        </button>
-      </section>
+      </div>
 
-      {/* 날짜·시간·장소·메모 바꾸기 / 삭제는 수정 화면에서 */}
-      <section className="border-t border-neutral-100 pt-4">
-        <button
-          type="button"
-          onClick={onEdit}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#F3F3F3] py-3 text-[14px] font-semibold text-neutral-700 active:bg-neutral-200"
-        >
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 20h4L19 9l-4-4L4 16v4z" />
-            <path d="M14 6l4 4" />
-          </svg>
-          일정 수정
+      <div>
+        <button type="button" onClick={onAddExpense} className={btnPrimary}>
+          지출 추가
         </button>
-        {google && !plan.placeId && (
-          <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-            일정 수정 → 장소 변경에서 구글로 다시 검색해 넣으면 평점·영업시간·전화가 나와요.
-          </p>
-        )}
-      </section>
+        <button type="button" onClick={onEdit} className="mx-auto mt-3 block px-2 py-1 text-[13px] text-neutral-400 underline underline-offset-2">
+          일정 수정·삭제
+        </button>
+      </div>
 
-      {info && <p className="text-right text-[11px] text-neutral-400">Google Maps</p>}
+      {timeOpen && (
+        <TimeDialog
+          start={plan.time || suggestTime}
+          hasValue={Boolean(plan.time)}
+          onDone={(v) => {
+            onUpdate({ time: v })
+            setTimeOpen(false)
+          }}
+          onClose={() => setTimeOpen(false)}
+        />
+      )}
     </Sheet>
   )
 }
 
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * 이 장소 사진: [사진 추가] → 폰 사진첩/카메라 → 줄여서 저장 → 3칸 바둑판, 누르면 크게 보기·삭제
+ * 카드를 열 때 그 장소 사진만 받아 온다 (일행이 올린 사진도 같이 보임)
+ */
+function PlacePhotos({ tripId, planId }: { tripId: string; planId: string }) {
+  const [photos, setPhotos] = useState<Photo[]>([])
+  const [uploading, setUploading] = useState(0)
+  const [error, setError] = useState('')
+  const [viewing, setViewing] = useState<Photo | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => repo.watchPhotos(tripId, planId, setPhotos, (e) => setError(`사진을 불러오지 못했어요: ${e.message}`)), [tripId, planId])
+
+  const add = async (files: File[]) => {
+    setError('')
+    setUploading((n) => n + files.length)
+    for (const file of files) {
+      try {
+        const small = await shrinkPhoto(file)
+        // 오프라인이면 서버 응답을 기다리지 않음 (화면엔 바로 보이고 연결되면 올라감)
+        repo.savePhoto(tripId, { id: newId(), planId, ...small, createdAt: Date.now() }).catch(reportError)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : '사진을 넣지 못했어요')
+      } finally {
+        setUploading((n) => n - 1)
+      }
+    }
+  }
+
   return (
-    <div className="flex gap-3">
-      <dt className="w-14 shrink-0 font-semibold text-neutral-800">{label}</dt>
-      <dd className="min-w-0 flex-1 text-neutral-600">{children}</dd>
+    <div>
+      <Row icon={<CameraIcon />} label="사진" onClick={() => inputRef.current?.click()}>
+        {photos.length > 0 ? <span className="text-neutral-700">사진 {photos.length}장 · <span className="font-semibold text-[#2F87F2]">추가</span></span> : <span className="text-neutral-400">사진 추가</span>}
+      </Row>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = [...(e.target.files ?? [])].filter((f) => f.type.startsWith('image/') || !f.type)
+          e.target.value = '' // 같은 사진을 다시 골라도 동작하게
+          if (files.length) void add(files)
+        }}
+      />
+      {(photos.length > 0 || uploading > 0) && (
+        <div className="grid grid-cols-3 gap-1.5 pb-2 pl-8">
+          {photos.map((p) => (
+            <button key={p.id} type="button" onClick={() => setViewing(p)} className="aspect-square overflow-hidden rounded-lg bg-neutral-100">
+              <img src={p.data} alt="장소 사진" loading="lazy" className="h-full w-full object-cover" />
+            </button>
+          ))}
+          {Array.from({ length: uploading }, (_, i) => (
+            <div key={`up-${i}`} className="flex aspect-square items-center justify-center rounded-lg bg-neutral-100 text-xs text-neutral-400">
+              올리는 중…
+            </div>
+          ))}
+        </div>
+      )}
+      {error && <p className="pb-2 pl-8 text-sm text-red-600">{error}</p>}
+      {viewing && (
+        <PhotoViewer
+          photo={viewing}
+          onDelete={() => {
+            if (!confirm('이 사진을 지울까요?')) return
+            repo.deletePhoto(tripId, viewing.id).catch(reportError)
+            setViewing(null)
+          }}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </div>
   )
 }
+
+/** 사진 크게 보기 (검은 화면 + 닫기·삭제). Esc는 이 창만 닫음 */
+function PhotoViewer({ photo, onDelete, onClose }: { photo: Photo; onDelete: () => void; onClose: () => void }) {
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  })
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      closeRef.current()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="사진 보기" className="fixed inset-0 z-[60] flex flex-col bg-black">
+      <div className="flex items-center justify-between px-2" style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}>
+        <button type="button" onClick={onDelete} className="rounded-full px-3 py-2 text-[15px] font-medium text-red-400 active:bg-white/10">
+          삭제
+        </button>
+        <button type="button" onClick={onClose} aria-label="닫기" className="rounded-full p-2.5 text-white active:bg-white/10">
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-2" onClick={onClose}>
+        <img src={photo.data} alt="장소 사진" className="max-h-full max-w-full object-contain" onClick={(e) => e.stopPropagation()} />
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+/** 아이콘 + 내용 한 줄 (누르면 그 자리에서 바꾸기) */
+function Row({ icon, label, onClick, children }: { icon: ReactNode; label: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button type="button" onClick={onClick} className="flex w-full items-start gap-3 py-2.5 text-left text-[15px] active:bg-neutral-50">
+      <span className="mt-0.5 text-neutral-500">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="sr-only">{label}: </span>
+        {children}
+      </span>
+    </button>
+  )
+}
+
+const iconCls = 'h-5 w-5'
+const ClockIcon = () => (
+  <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </svg>
+)
+const MemoIcon = () => (
+  <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+    <path d="M5 7h14M5 12h14M5 17h9" />
+  </svg>
+)
+const CameraIcon = () => (
+  <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" />
+    <circle cx="12" cy="13" r="3.2" />
+  </svg>
+)
+const WalletIcon = () => (
+  <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="6" width="18" height="13" rx="2.5" />
+    <path d="M3 10h18M7 15h4" />
+  </svg>
+)

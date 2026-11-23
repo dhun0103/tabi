@@ -31,9 +31,9 @@ interface Props {
 /**
  * 지출 입력·수정. 가계부 탭에서도, 일정의 장소에서도 연다
  * 날짜·연결된 장소는 연 곳에서 정해지고(가계부의 Day 칸, 장소 카드) 창에서는 고르지 않는다
+ * "누가 냈나요"·"나누기" 칸은 없앰: 새 지출은 일행 첫 사람 · 다 같이 나눔으로 저장, 예전 지출의 값은 그대로 둠
  */
 export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) {
-  const group = trip.members.length >= 2
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'JPY')
   const [category, setCategory] = useState<Category>(initial?.category ?? prefill?.category ?? 'food')
@@ -42,8 +42,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
   const planId = initial?.planId ?? prefill?.planId ?? ''
   const memo = initial?.memo ?? '' // 메모 칸은 없앰 (예전에 적은 메모는 그대로 둠)
   const [method, setMethod] = useState<PayMethod>(initial?.method ?? 'card')
-  const [payer, setPayer] = useState(initial?.payer ?? trip.members[0] ?? '')
-  const [shared, setShared] = useState(initial?.shared ?? true)
   const [error, setError] = useState('')
 
   /* ── 환율: 지출을 적는 순간의 환율을 이 지출에 저장 (트리플처럼) ── */
@@ -96,7 +94,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
             : `${fmtDay(rateDate)} 기준`
 
   const value = Number(amount.replace(/[^0-9.]/g, ''))
-  const payers = payer && !trip.members.includes(payer) ? [...trip.members, payer] : trip.members
   const linked = plans.find((p) => p.id === planId)
   // 제목 아래: 어느 날(가계부 칸과 같은 이름) + 연결된 장소
   const when =
@@ -129,8 +126,8 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
       rateDate: jpyFixed && rateKind !== 'manual' ? rateDate : '',
       category,
       method,
-      payer: group ? payer : (trip.members[0] ?? ''),
-      shared: group ? shared : true,
+      payer: initial?.payer ?? trip.members[0] ?? '',
+      shared: initial?.shared ?? true,
       memo,
       planId,
       createdAt: initial?.createdAt ?? now,
@@ -242,26 +239,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
           </Chip>
         ))}
       </Group>
-
-      {group && (
-        <>
-          <Group label="누가 냈나요">
-            {payers.map((name) => (
-              <Chip key={name} active={payer === name} onClick={() => setPayer(name)}>
-                {name}
-              </Chip>
-            ))}
-          </Group>
-          <Group label="나누기">
-            <Chip active={shared} onClick={() => setShared(true)}>
-              일행 1/N
-            </Chip>
-            <Chip active={!shared} onClick={() => setShared(false)}>
-              개인 지출
-            </Chip>
-          </Group>
-        </>
-      )}
     </Sheet>
   )
 }

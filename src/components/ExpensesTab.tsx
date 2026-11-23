@@ -8,7 +8,6 @@ import {
   fmtJPY,
   fmtKRW,
   fmtMoney,
-  sharePerPerson,
   todayStr,
   tripDays,
 } from '../lib/util'
@@ -53,7 +52,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
   const scoped = filter === 'all' ? expenses : itemsOf(filter)
   const total = sum(scoped.map(krw))
   const jpy = sum(scoped.filter((e) => e.currency === 'JPY').map((e) => e.amount))
-  const perPerson = group ? sharePerPerson(trip.members, scoped, rate) : null // 고른 기간 기준
+  const perPerson = group ? total / trip.members.length : 0 // 고른 기간의 합계를 일행 수로 나눔
   const placeOf = (e: Expense) => (e.planId ? plans.find((p) => p.id === e.planId)?.title : '')
 
   return (
@@ -83,10 +82,10 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
           <p className="mt-1 text-[34px] font-extrabold leading-tight tracking-tight">{fmtKRW(total)}</p>
           <p className="mt-1 text-[13px] text-neutral-500">
             엔화 {fmtJPY(jpy)}
-            {perPerson && perPerson.total > 0 && (
+            {perPerson > 0 && (
               <>
                 {' '}
-                <span className="text-neutral-300">·</span> 1인당 {fmtKRW(perPerson.share)}
+                <span className="text-neutral-300">·</span> 1인당 {fmtKRW(perPerson)}
               </>
             )}
           </p>
@@ -111,7 +110,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
                   const place = placeOf(e)
                   const left = [
                     place ? `📍 ${place}` : c.label,
-                    group ? (e.shared ? `${e.payer} 결제 · 1/N` : `${e.payer} 개인`) : METHODS.find((m) => m.id === e.method)?.label,
+                    METHODS.find((m) => m.id === e.method)?.label,
                   ]
                     .filter(Boolean)
                     .join(' · ')

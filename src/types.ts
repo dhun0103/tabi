@@ -9,7 +9,7 @@ export interface Trip {
   startDate: string // YYYY-MM-DD
   endDate: string // YYYY-MM-DD
   krwPer100Jpy: number // 기본 환율 100엔 = ?원 (환율을 못 불러올 때, 환율이 저장 안 된 예전 지출에 사용)
-  members: string[] // 일행 이름 (가계부 "누가 냈나"에 사용)
+  members: string[] // 일행 이름 (가계부 1인당 금액 = 합계 ÷ 일행 수)
   createdAt: number
   updatedAt: number
 }
@@ -44,6 +44,7 @@ export interface Expense {
   rateDate: string // 그 환율의 기준일 YYYY-MM-DD ('' = 직접 넣은 환율)
   category: Category
   method: PayMethod
+  // 아래 둘은 입력 칸을 없앴음 (새 지출은 일행 첫 사람 · true로 저장, 예전 값은 그대로 둠)
   payer: string
   shared: boolean // true = 일행이 1/N, false = 개인 지출
   memo: string

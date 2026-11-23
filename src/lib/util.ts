@@ -132,16 +132,6 @@ export const METHODS: { id: PayMethod; label: string }[] = [
   { id: 'card', label: '카드' },
 ]
 
-/**
- * 공동 경비("일행 1/N"으로 적은 지출)의 합계와 1인당 금액 (원화, 지출마다 그때 환율)
- * 일행 명단에 없는 사람이 결제자로 적혀 있으면 그 사람도 머릿수에 넣음
- */
-export function sharePerPerson(members: string[], expenses: Expense[], tripRate: number) {
-  const shared = expenses.filter((e) => e.shared)
-  const people = new Set([...members, ...shared.map((e) => e.payer).filter(Boolean)])
-  const total = shared.reduce((a, e) => a + expenseKRW(e, tripRate), 0)
-  return { total, share: people.size ? total / people.size : 0 }
-}
 
 /* ───────── 공유 링크 ───────── */
 

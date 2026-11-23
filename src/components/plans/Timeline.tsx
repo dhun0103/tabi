@@ -16,12 +16,16 @@ interface Props {
 /*
  * 왼쪽 세로선 위에 작은 번호 원 + 그 아래 시간 (NOL·트리플처럼), 장소와 장소 사이 선 위에 거리 알약(누르면 그 구간 길찾기)
  * 장소는 사진 없는 흰 카드: 굵은 이름 + "종류 · 동네" 한 줄
+ * 번호 원은 카드 제목 줄, 시간은 카드 둘째 줄과 같은 높이 → 아래 숫자들은 카드 여백·줄 높이에서 나옴
  */
 
 const RAIL = 'w-12' // 왼쪽 선 칸 너비
-const CIRCLE_TOP = 18 // 번호 원 중심 높이(px) = 카드 제목 줄
-const TIME_TOP = 32 // 시간 글자 위쪽 (번호 원 바로 아래)
-const TIME_GAP = 32 // 시간이 있으면 아래 선을 이만큼 띄워서 글자와 겹치지 않게
+const PAD_TOP = 18 // 줄 위 여백(py-1.5 = 6) + 카드 위 여백(py-3 = 12) = 제목 줄이 시작하는 높이
+const TITLE_LH = 22 // 제목 줄 높이 (leading-[22px])
+const META_LH = 20 // 둘째 줄 높이 (leading-5)
+const CIRCLE_TOP = PAD_TOP + TITLE_LH / 2 // 번호 원 중심 = 제목 줄 가운데
+const TIME_TOP = PAD_TOP + TITLE_LH + 2 // 시간 칸 위쪽 = 둘째 줄 위쪽 (mt-0.5)
+const TIME_GAP = TIME_TOP + META_LH - CIRCLE_TOP // 시간이 있으면 시간 칸 아래부터 선을 다시 그림
 
 /** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 (gap: 가운데 아래로 선을 비울 길이) */
 function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: number; children?: ReactNode }) {
@@ -53,14 +57,15 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     if (p.type === 'memo') {
       rows.push(
         <li key={p.id} id={`plan-${p.id}`} className="flex">
-          <Rail top={!first} bottom={!last} center={22}>
-            <span className="absolute left-1/2 top-[18px] h-2 w-2 -translate-x-1/2 rounded-full bg-neutral-300" />
+          {/* 점 중심 27 = 줄 위 여백 6 + 테두리 1 + 안쪽 여백 10 + 첫 줄(20)의 가운데 10 */}
+          <Rail top={!first} bottom={!last} center={27}>
+            <span className="absolute left-1/2 top-[23px] h-2 w-2 -translate-x-1/2 rounded-full bg-neutral-300" />
           </Rail>
           <div className="flex min-w-0 flex-1 py-1.5">
             <button
               type="button"
               onClick={() => onOpen(p)}
-              className="min-w-0 flex-1 whitespace-pre-wrap rounded-xl border border-dashed border-neutral-300 bg-white/60 px-4 py-2.5 text-left text-[13px] leading-relaxed text-neutral-600"
+              className="min-w-0 flex-1 whitespace-pre-wrap rounded-xl border border-dashed border-neutral-300 bg-white/60 px-4 py-2.5 text-left text-[13px] leading-5 text-neutral-600"
             >
               <span className="mr-1.5 font-semibold text-neutral-800">메모</span>
               {p.title}
@@ -106,8 +111,8 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
         <Rail top={!first} bottom={!last} gap={p.time ? TIME_GAP : 0}>
           {p.time && (
             <span
-              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold tabular-nums leading-none text-neutral-500"
-              style={{ top: TIME_TOP }}
+              className="absolute left-1/2 flex -translate-x-1/2 items-center whitespace-nowrap text-[11px] font-semibold tabular-nums leading-none text-neutral-500"
+              style={{ top: TIME_TOP, height: META_LH }}
             >
               {p.time}
             </span>
@@ -133,8 +138,9 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
           >
             <span className="flex items-start gap-2">
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-bold leading-snug text-neutral-900">{p.title}</span>
-                {meta && <span className="mt-0.5 block truncate text-[13px] text-neutral-500">{meta}</span>}
+                <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{p.title}</span>
+                {/* 시간이 있으면 둘째 줄 자리를 비워 두더라도 남겨서 시간이 카드 안에 오게 */}
+                {(meta || p.time) && <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">{meta || '\u00a0'}</span>}
               </span>
               {money && <span className="shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-neutral-700">{money}</span>}
             </span>

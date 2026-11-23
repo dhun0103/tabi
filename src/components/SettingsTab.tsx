@@ -127,7 +127,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
           hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 환율을 못 불러올 때와 환율이 저장 안 된 예전 지출에만 써요."
         />
         <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">일행 (가계부 정산에 사용)</span>
+          <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">일행 (가계부 '누가 냈나'·1인당 금액에 사용)</span>
           <div className="flex flex-wrap gap-1.5">
             {members.map((m) => (
               <span key={m} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 py-1.5 pl-3.5 pr-1.5 text-sm">

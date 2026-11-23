@@ -132,44 +132,15 @@ export const METHODS: { id: PayMethod; label: string }[] = [
   { id: 'card', label: '카드' },
 ]
 
-export interface Settlement {
-  people: { name: string; paid: number; balance: number }[] // balance > 0 이면 받을 돈
-  share: number // 1인당 부담액
-  total: number // 공동 경비 합계
-  transfers: { from: string; to: string; amount: number }[]
-}
-
-/** 공동 경비(shared)를 1/N 해서 누가 누구에게 얼마 보내면 되는지 계산 (원화 기준, 지출마다 그때 환율) */
-export function settle(members: string[], expenses: Expense[], tripRate: number): Settlement {
+/**
+ * 공동 경비("일행 1/N"으로 적은 지출)의 합계와 1인당 금액 (원화, 지출마다 그때 환율)
+ * 일행 명단에 없는 사람이 결제자로 적혀 있으면 그 사람도 머릿수에 넣음
+ */
+export function sharePerPerson(members: string[], expenses: Expense[], tripRate: number) {
   const shared = expenses.filter((e) => e.shared)
-  const names = [...new Set([...members, ...shared.map((e) => e.payer).filter(Boolean)])]
-  const paid = new Map(names.map((n) => [n, 0]))
-  let total = 0
-  for (const e of shared) {
-    const v = expenseKRW(e, tripRate)
-    total += v
-    paid.set(e.payer, (paid.get(e.payer) ?? 0) + v)
-  }
-  const share = names.length ? total / names.length : 0
-  const people = names.map((name) => ({ name, paid: paid.get(name) ?? 0, balance: (paid.get(name) ?? 0) - share }))
-
-  const debtors = people.filter((p) => p.balance < -0.5).map((p) => ({ name: p.name, amt: -p.balance }))
-  const creditors = people.filter((p) => p.balance > 0.5).map((p) => ({ name: p.name, amt: p.balance }))
-  debtors.sort((a, b) => b.amt - a.amt)
-  creditors.sort((a, b) => b.amt - a.amt)
-
-  const transfers: Settlement['transfers'] = []
-  let i = 0
-  let j = 0
-  while (i < debtors.length && j < creditors.length) {
-    const x = Math.min(debtors[i].amt, creditors[j].amt)
-    if (x >= 1) transfers.push({ from: debtors[i].name, to: creditors[j].name, amount: Math.round(x) })
-    debtors[i].amt -= x
-    creditors[j].amt -= x
-    if (debtors[i].amt < 0.5) i++
-    if (creditors[j].amt < 0.5) j++
-  }
-  return { people, share, total, transfers }
+  const people = new Set([...members, ...shared.map((e) => e.payer).filter(Boolean)])
+  const total = shared.reduce((a, e) => a + expenseKRW(e, tripRate), 0)
+  return { total, share: people.size ? total / people.size : 0 }
 }
 
 /* ───────── 공유 링크 ───────── */

@@ -120,7 +120,7 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
             autoFill
             hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 인터넷이 안 될 때 쓰는 기본값이에요."
           />
-          <Field label="일행 (선택, 쉼표로 구분)" hint="2명 이상이면 가계부에 '누가 냈나'와 1/N 정산이 생겨요">
+          <Field label="일행 (선택, 쉼표로 구분)" hint="2명 이상이면 가계부에 '누가 냈나'와 1인당 금액이 나와요">
             <input value={members} onChange={(e) => setMembers(e.target.value)} placeholder="예: 나, 민수, 지영" className={inputCls} />
           </Field>
           {error && <p className="text-sm text-red-600">{error}</p>}

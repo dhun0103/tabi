@@ -56,14 +56,6 @@ interface Props {
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
-/** 2026.12.5 - 12.8 (해가 바뀌면 끝에도 연도) */
-function fmtRange(start: string, end: string) {
-  const [y1, m1, d1] = start.split('-').map(Number)
-  if (!end || end === start) return `${y1}.${m1}.${d1}`
-  const [y2, m2, d2] = end.split('-').map(Number)
-  return `${y1}.${m1}.${d1} - ${y2 === y1 ? '' : `${y2}.`}${m2}.${d2}`
-}
-
 /** 트리플 영수증 느낌의 점선 */
 const Dashed = () => (
   <div aria-hidden="true" className="h-px" style={{ backgroundImage: 'linear-gradient(to right, #D5DAE0 50%, transparent 50%)', backgroundSize: '8px 1px' }} />
@@ -71,9 +63,9 @@ const Dashed = () => (
 
 /**
  * 카테고리별 지출 페이지 (트리플 "지출내역" 구성 + 원그래프)
- *   큰 제목(기간 · 여행 이름 · 지출내역입니다.) → 총 지출 금액 → "○○에서 가장 많이 썼어요." + 원그래프 → 카테고리 목록
+ *   큰 제목(여행 이름 · 지출내역입니다.) → 총 지출 금액(+ 기간 고르기) → "○○에서 가장 많이 썼어요." + 원그래프 → 카테고리 목록
  *   목록 줄이나 원그래프 칸을 누르면 그 카테고리를 강조 (문장·가운데 비율도 바뀜), 다시 누르면 처음으로
- *   제목이 위로 지나가면 위 막대에 여행 이름·기간이 작게 나옴. 닫기: ✕ · 휴대폰 뒤로 가기 · Esc
+ *   제목이 위로 지나가면 위 막대에 여행 이름이 작게 나옴. 닫기: ✕ · 휴대폰 뒤로 가기 · Esc
  */
 export function CategoryPage({ trip, expenses, periods, period, onPeriod, onClose }: Props) {
   const [picked, setPicked] = useState<Category | null>(null)
@@ -115,8 +107,6 @@ export function CategoryPage({ trip, expenses, periods, period, onPeriod, onClos
   }
   const toggle = (id: Category) => setPicked((cur) => (cur === id ? null : id))
 
-  const range = fmtRange(trip.startDate, trip.endDate)
-  const when = period === 'all' ? range : (periods.find((p) => p.value === period)?.label ?? range)
   const headline = sel ? [`${sel.label}에`, `${fmtKRW(sel.value)} 썼어요.`] : rows.length === 1 ? ['모두', `${rows[0].label}에 썼어요.`] : [`${rows[0]?.label}에서`, '가장 많이 썼어요.']
 
   return (
@@ -138,18 +128,15 @@ export function CategoryPage({ trip, expenses, periods, period, onPeriod, onClos
             </svg>
           </button>
           {/* 큰 제목이 위로 지나가면 여기 작게 (트리플처럼) */}
-          <div className={`min-w-0 transition-opacity duration-200 ${compact ? 'opacity-100' : 'opacity-0'}`} aria-hidden={!compact}>
-            <p className="truncate text-[15px] font-bold leading-tight">{trip.name}</p>
-            <p className="truncate text-[12px] leading-tight text-neutral-400">{when}</p>
-          </div>
+          <p className={`min-w-0 truncate text-[16px] font-bold transition-opacity duration-200 ${compact ? 'opacity-100' : 'opacity-0'}`} aria-hidden={!compact}>
+            {trip.name}
+          </p>
         </div>
       </header>
 
       <div className="mx-auto max-w-lg px-6" style={{ paddingBottom: 'calc(40px + env(safe-area-inset-bottom))' }}>
         <div ref={titleRef} className="pb-7 pt-3">
           <h2 className="text-[24px] font-bold leading-[1.42] tracking-tight">
-            {when}
-            <br />
             {trip.name}
             <br />
             지출내역입니다.

@@ -5,7 +5,7 @@ import { PlansTab } from './components/plans/PlansTab'
 import { SettingsTab } from './components/SettingsTab'
 import { useOnline, useTripData } from './hooks/useTripData'
 import { forgetTrip, loadCurrent, rememberTrip, saveCurrent } from './lib/session'
-import { ddayLabel, fmtDay, parseTripId, tripDays } from './lib/util'
+import { ddayLabel, fmtDay, parseTripId } from './lib/util'
 import { repo } from './store'
 import type { Trip } from './types'
 
@@ -99,34 +99,35 @@ function Center({ children }: { children: ReactNode }) {
   return <div className="flex min-h-dvh flex-col items-center justify-center bg-[#f4f5f8] px-6 text-center">{children}</div>
 }
 
+/**
+ * 왼쪽: 여행 이름 + 날짜, 오른쪽: D-day (여행 중엔 "여행 N일째", 끝나면 회색 "다녀온 여행")
+ * 저장 상태는 평소(공유 중)엔 숨기고, 인터넷이 끊겼을 때만 D-day 왼쪽에 "오프라인" (고친 건 폰에 두었다가 연결되면 올라감)
+ */
 function Header({ trip, online }: { trip: Trip; online: boolean }) {
-  const n = tripDays(trip.startDate, trip.endDate).length
-  const length = n <= 1 ? '당일치기' : `${n - 1}박 ${n}일`
   const dday = ddayLabel(trip.startDate, trip.endDate)
-  const status =
-    repo.mode === 'local'
-      ? { dot: 'bg-neutral-300', text: '이 기기에만 저장' }
-      : online
-        ? { dot: 'bg-emerald-500', text: '공유 중' }
-        : { dot: 'bg-amber-500', text: '오프라인' }
+  const past = dday === '다녀온 여행'
+  const dates = trip.endDate && trip.endDate !== trip.startDate ? `${fmtDay(trip.startDate)} – ${fmtDay(trip.endDate)}` : fmtDay(trip.startDate)
+  const status = repo.mode === 'local' ? { dot: 'bg-neutral-300', text: '이 기기에만 저장' } : online ? null : { dot: 'bg-amber-500', text: '오프라인' }
 
   // 높이 56px 고정 (일정 탭의 날짜 줄이 이 아래에 붙는다)
   return (
     <header className="sticky top-0 z-30 border-b border-neutral-200/60 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="mx-auto flex h-14 max-w-lg items-center justify-between gap-3 px-4">
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-[18px] font-extrabold leading-tight tracking-tight">
-            <span className="truncate">{trip.name}</span>
-            {dday && <span className="shrink-0 rounded-full bg-[#2F87F2] px-2 py-0.5 text-[11px] font-semibold text-white">{dday}</span>}
-          </h1>
-          <p className="text-xs text-neutral-400">
-            {fmtDay(trip.startDate)} – {fmtDay(trip.endDate)} · {length}
-          </p>
+          <h1 className="truncate text-[18px] font-extrabold leading-tight tracking-tight">{trip.name}</h1>
+          <p className="text-xs text-neutral-400">{dates}</p>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-neutral-400">
-          <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} aria-hidden="true" />
-          {status.text}
-        </span>
+        <div className="flex shrink-0 items-center gap-2.5">
+          {status && (
+            <span className="flex items-center gap-1.5 text-[11px] text-neutral-500" role="status">
+              <span className={`h-1.5 w-1.5 rounded-full ${status.dot}`} aria-hidden="true" />
+              {status.text}
+            </span>
+          )}
+          {dday && (
+            <span className={`rounded-full px-2.5 py-1 text-[12px] font-bold ${past ? 'bg-neutral-100 text-neutral-500' : 'bg-[#2F87F2] text-white'}`}>{dday}</span>
+          )}
+        </div>
       </div>
     </header>
   )

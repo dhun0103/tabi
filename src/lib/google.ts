@@ -86,6 +86,17 @@ export async function googleSuggest(
   })
 }
 
+/**
+ * 한국어 주소에서 "구, 시"만 뽑기: "일본 아이치현 나고야시 나카구 혼마루 1−1" → "나카구, 나고야시"
+ * (도쿄처럼 시가 없으면 "시부야구, 도쿄도")
+ */
+export function areaFromKoAddress(text: string): string {
+  const words = text.split(/[\s,]+/).filter((w) => w && w !== '일본')
+  const ward = words.find((w) => /.구$/.test(w))
+  const city = words.find((w) => /.시$/.test(w)) ?? (ward ? words.find((w) => /.(도|부|현)$/.test(w)) : undefined)
+  return [ward, city].filter(Boolean).join(', ')
+}
+
 /** 고른 후보의 위치·종류·동네를 가져온다 (검색 세션은 여기서 끝남) */
 export async function googleResolve(s: GoogleSuggestion): Promise<PlaceResult> {
   const place = s.prediction.toPlace()
@@ -105,7 +116,10 @@ export async function googleResolve(s: GoogleSuggestion): Promise<PlaceResult> {
     lat: loc.lat(),
     lng: loc.lng(),
     kind: place.primaryTypeDisplayName ?? '',
-    area: [district, city].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', '),
+    // 구글 상세의 주소 조각은 일본 주소를 한국어로 안 줘서(Naka Ward) 자동완성 후보의 한국어 주소를 먼저 쓴다
+    area:
+      areaFromKoAddress(s.secondary) ||
+      [district, city].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(', '),
   }
 }
 

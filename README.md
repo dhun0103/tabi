@@ -86,8 +86,18 @@ Google Cloud 콘솔 (Firebase와 같은 프로젝트 사용 가능)
    · 애플리케이션 제한: 웹사이트 → http://localhost:5173/*, https://<배포주소>/*
    · API 제한: Maps JavaScript API, Places API (New) 두 개만
 → (권장) 지도 관리 → 지도 ID 만들기 (JavaScript) → VITE_GOOGLE_MAP_ID
-→ (권장) 할당량에서 하루 요청 수 상한 걸기 → 무료 한도 넘는 요금 방지
+→ (권장) 결제 → 예산 및 알림 → 월 예산 알림 (넘으면 메일)
 → .env.local 에 VITE_GOOGLE_MAPS_API_KEY 입력
+```
+
+요금이 새지 않게 막는 장치
+
+```text
+무료 체험판 결제 계정   직접 "유료 계정으로 업그레이드"를 누르기 전엔 청구 없음
+키 제한               허용한 웹사이트 + API 2개에서만 동작
+예산 알림             월 예산을 넘으면 메일
+하루 요청 상한         ✕ 콘솔에서 지도·장소 API 할당량이 "조정 불가"로 나옴
+지출 한도(자동 정지)    ✕ Cloud Run·Gemini 등 일부 서비스만 대상, 지도 API는 안 됨
 ```
 
 요금: SKU마다 매달 무료 한도 (Essentials 10,000건 · Pro 5,000건 · Enterprise 1,000건).

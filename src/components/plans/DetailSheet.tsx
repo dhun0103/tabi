@@ -6,7 +6,7 @@ import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
 import { CategoryIcon, MemoIcon } from '../icons'
 import { TimeDialog } from '../TimePicker'
-import { MINT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
+import { MINT_INK, MINT_SOFT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
 
 interface Props {
   tripId: string
@@ -86,22 +86,26 @@ export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdat
 
         {expenses.length > 0 && (
           <div className="py-2.5">
-            <div className="flex items-center gap-3 text-[15px]">
+            {/* pr-3: 아래 상자 안쪽 여백만큼 들여서 합계와 내역 금액의 오른쪽 끝을 한 줄에 맞춤 */}
+            <div className="flex items-center gap-3 pr-3 text-[15px]">
               <span className="text-neutral-500">
                 <WalletIcon />
               </span>
               <span className="flex-1 text-neutral-700">이 장소에서 쓴 돈</span>
               <span className="font-bold tabular-nums">{fmtKRW(total)}</span>
             </div>
-            <ul className="mt-1 pl-8">
+            {/* 내역이 위 합계에 들어 있는 느낌: 합계 글자 줄에 맞춘 연한 회색 상자로 묶고, 금액은 합계보다 한 단계 가볍게 */}
+            <ul className="ml-8 mt-2 divide-y divide-black/[0.05] rounded-xl bg-[#F5F6F8] px-3">
               {expenses.map((e) => (
                 <li key={e.id}>
-                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2 py-2 text-left text-[14px] active:bg-neutral-50">
-                    <span style={{ color: MINT }}>
-                      <CategoryIcon category={e.category} className="h-4 w-4" />
+                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2 py-2.5 text-left text-[14px] active:opacity-70">
+                    {/* 카테고리는 늘 맨 앞에 민트 알약(아이콘 + 이름), 그 뒤에 지출 이름 (이름이 없으면 비워 둠) */}
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[12px] font-semibold" style={{ background: MINT_SOFT, color: MINT_INK }}>
+                      <CategoryIcon category={e.category} className="h-3.5 w-3.5" />
+                      {categoryOf(e.category).label}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-neutral-600">{e.title || categoryOf(e.category).label}</span>
-                    <span className="font-semibold tabular-nums">{fmtMoney(e.amount, e.currency)}</span>
+                    <span className="min-w-0 flex-1 truncate text-neutral-700">{e.title}</span>
+                    <span className="font-medium tabular-nums text-neutral-600">{fmtMoney(e.amount, e.currency)}</span>
                   </button>
                 </li>
               ))}

@@ -8,6 +8,7 @@ const HOUR = 60 * 60 * 1000
  * 새 버전 알림
  *   배포 → 폰이 뒤에서 새 버전을 받아 둠(대기) → 이 배너 → [새로고침]을 누르면 바로 새 버전
  *   입력하는 중이면 안 누르면 그만. 앱을 완전히 껐다 켜도 새 버전으로 바뀐다
+ * 자리: 탭바 바로 위 (한 손으로 엄지가 닿는 곳, 화면 내용은 거의 안 가림)
  * 시트(입력 창)보다 아래 층(z-40)이라 입력 중엔 가려져서 방해하지 않는다
  */
 export function UpdateBanner() {
@@ -38,7 +39,7 @@ export function UpdateBanner() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4" style={{ top: 'calc(env(safe-area-inset-top) + 64px)' }}>
+    <div className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-4" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}>
       <div
         role="status"
         className="pointer-events-auto flex items-center gap-1 rounded-full bg-neutral-900 py-1.5 pl-4 pr-1.5 text-sm text-white shadow-lg shadow-black/20"

@@ -171,7 +171,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
           <h2 className="min-w-0 truncate">
             <span className="text-[16px] font-bold">{view === UNDATED ? '가고 싶은 곳' : `Day ${days.indexOf(view) + 1}`}</span>
             <span className="ml-1.5 text-[14px] text-neutral-400">
-              {view === UNDATED ? '날짜 미정' : fmtDay(view)} · {placeCount(dayList)}곳
+              {view === UNDATED ? '날짜 미정' : fmtDay(view)}
             </span>
           </h2>
           <div className="flex shrink-0 items-center gap-1">

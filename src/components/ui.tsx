@@ -6,6 +6,8 @@ import { useEffect, useRef, type ReactNode } from 'react'
  */
 export const BLUE = '#2F87F2' // 주요 버튼·선택 상태 (흰 글자 대비 3.6:1, 굵은 글자용)
 export const MINT = '#0E9A90' // 가계부 카테고리 아이콘 (흰 바탕 대비 3.4:1)
+export const MINT_SOFT = '#E8F6F5' // 카테고리 알약 바탕 (연한 민트)
+export const MINT_INK = '#0A6E67' // 카테고리 알약 글자·아이콘 (MINT_SOFT 바탕 대비 5.5:1)
 
 export const cardCls = 'rounded-2xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05),0_4px_14px_rgba(16,24,40,0.06)]'
 export const inputCls =
@@ -118,23 +120,6 @@ export function Chip(props: { active: boolean; onClick: () => void; children: Re
       }`}
     >
       {props.children}
-    </button>
-  )
-}
-
-/** 오른쪽 아래 + 버튼 */
-export function Fab(props: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={props.onClick}
-      aria-label={props.label}
-      className="fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#2F87F2] text-white shadow-lg shadow-black/20 active:scale-95"
-      style={{ right: 'max(16px, calc(50vw - 256px + 16px))', bottom: 'calc(76px + env(safe-area-inset-bottom))' }}
-    >
-      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-        <path d="M12 5v14M5 12h14" />
-      </svg>
     </button>
   )
 }

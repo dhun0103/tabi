@@ -157,7 +157,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
         />
       )}
       {sheet?.kind === 'stats' && (
-        <CategoryPage expenses={scoped} rate={rate} periods={periods} period={filter} onPeriod={setFilter} onClose={() => setSheet(null)} />
+        <CategoryPage trip={trip} expenses={scoped} periods={periods} period={filter} onPeriod={setFilter} onClose={() => setSheet(null)} />
       )}
     </>
   )

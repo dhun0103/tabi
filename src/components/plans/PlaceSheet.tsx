@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
 import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type GoogleSuggestion } from '../../lib/google'
 import { orderForInsert } from '../../lib/order'
-import { fmtDay, newId } from '../../lib/util'
+import { dayText, fmtDay, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { MapView } from '../map/MapView'
+import { TimePicker } from '../TimePicker'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
 interface Spot extends LatLng {
@@ -187,6 +188,8 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
   return (
     <Sheet
       title={initial ? '장소 수정' : '장소 추가'}
+      // 추가할 땐 날짜를 고르지 않고 지금 보고 있는 날에 넣는다 → 어느 날인지 제목 아래에 표시
+      subtitle={initial ? undefined : <p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -320,25 +323,23 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
       </Field>
       {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-[1fr_auto] gap-3">
-        <Field label="날짜">
-          <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
-            {dateOptions.map((d) => (
-              <option key={d} value={d}>
-                {days.includes(d) ? `DAY ${days.indexOf(d) + 1} · ${fmtDay(d)}` : fmtDay(d)}
-              </option>
-            ))}
-            <option value="">날짜 미정</option>
-          </select>
-        </Field>
-        <Field label="시간 (선택)">
-          <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${inputCls} min-w-28`} />
-        </Field>
-      </div>
-      {time && (
-        <button type="button" onClick={() => setTime('')} className="-mt-3 text-xs text-neutral-400 underline">
-          시간 지우기
-        </button>
+      {initial ? (
+        // 수정할 때만 날짜를 바꿀 수 있음 (다른 날로 옮기기)
+        <div className="grid grid-cols-[1fr_auto] gap-3">
+          <Field label="날짜">
+            <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
+              {dateOptions.map((d) => (
+                <option key={d} value={d}>
+                  {days.includes(d) ? `DAY ${days.indexOf(d) + 1} · ${fmtDay(d)}` : fmtDay(d)}
+                </option>
+              ))}
+              <option value="">날짜 미정</option>
+            </select>
+          </Field>
+          <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date, initial.id)} className="min-w-32" />
+        </div>
+      ) : (
+        <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date)} />
       )}
 
       <Field label="메모 (선택)">

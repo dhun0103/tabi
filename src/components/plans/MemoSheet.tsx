@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { orderForInsert } from '../../lib/order'
-import { fmtDay, newId } from '../../lib/util'
+import { dayText, fmtDay, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
@@ -51,6 +51,8 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
   return (
     <Sheet
       title={initial ? '메모 수정' : '메모 추가'}
+      // 추가할 땐 지금 보고 있는 날에 넣는다
+      subtitle={initial ? undefined : <p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -79,16 +81,19 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
         />
       </Field>
       {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
-      <Field label="날짜">
-        <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
-          {days.map((d, i) => (
-            <option key={d} value={d}>
-              DAY {i + 1} · {fmtDay(d)}
-            </option>
-          ))}
-          <option value="">날짜 미정</option>
-        </select>
-      </Field>
+      {initial && (
+        // 수정할 때만 다른 날로 옮길 수 있음
+        <Field label="날짜">
+          <select value={date} onChange={(e) => setDate(e.target.value)} className={inputCls}>
+            {days.map((d, i) => (
+              <option key={d} value={d}>
+                DAY {i + 1} · {fmtDay(d)}
+              </option>
+            ))}
+            <option value="">날짜 미정</option>
+          </select>
+        </Field>
+      )}
     </Sheet>
   )
 }

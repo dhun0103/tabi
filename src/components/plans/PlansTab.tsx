@@ -12,12 +12,11 @@ import { MemoSheet } from './MemoSheet'
 import { PlaceSheet } from './PlaceSheet'
 import { Timeline } from './Timeline'
 
-const ALL = 'all' // 전체 일정 보기
 const UNDATED = '' // 날짜 미정 = 가고 싶은 곳 모음
 
 type SheetState =
   | { kind: 'detail'; plan: Plan }
-  | { kind: 'place'; plan: Plan | null; date?: string }
+  | { kind: 'place'; plan: Plan | null }
   | { kind: 'memo'; plan: Plan | null }
   | { kind: 'expense'; plan: Plan; expense: Expense | null }
   | null
@@ -27,9 +26,9 @@ const addBtn =
 
 export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[]; expenses: Expense[] }) {
   const days = useMemo(() => tripDays(trip.startDate, trip.endDate), [trip.startDate, trip.endDate])
-  // 여행 중이면 오늘, 아니면 전체 일정부터
-  const [picked, setPicked] = useState(() => (days.includes(todayStr()) ? todayStr() : ALL))
-  const view = picked === ALL || picked === UNDATED || days.includes(picked) ? picked : ALL
+  // 여행 중이면 오늘, 아니면 Day 1부터 (전체 보기는 없음: 트리플처럼 하루씩)
+  const [picked, setPicked] = useState(() => (days.includes(todayStr()) ? todayStr() : (days[0] ?? UNDATED)))
+  const view = picked === UNDATED || days.includes(picked) ? picked : (days[0] ?? UNDATED)
   const [editing, setEditing] = useState(false)
   const [sheet, setSheet] = useState<SheetState>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -66,17 +65,18 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     tabRefs.current.get(view)?.scrollIntoView({ block: 'nearest', inline: 'center' })
   }, [view])
 
-  // 지도: 전체면 날짜마다 색이 다른 핀·동선, 하루면 그날만
-  const groups = view === ALL ? days.map((d) => ({ key: d, items: itemsOf(d) })) : [{ key: view, items: itemsOf(view) }]
+  const dayList = itemsOf(view)
+
+  // 지도: 고른 날의 장소만 (날짜 색 번호 핀 + 동선)
   const pins: MapPin[] = []
   const routes: MapRoute[] = []
-  for (const g of groups) {
-    const c = colorOf(g.key)
-    const places = g.items.filter((p) => p.type === 'place')
+  {
+    const c = colorOf(view)
+    const places = dayList.filter((p) => p.type === 'place')
     places.forEach((p, i) => {
       if (hasCoords(p)) pins.push({ id: p.id, lat: p.lat, lng: p.lng, label: String(i + 1), title: p.title, color: c.bg, ink: c.ink })
     })
-    if (g.key !== UNDATED) routes.push({ color: c.bg, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })
+    if (view !== UNDATED) routes.push({ color: c.bg, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })
   }
 
   const flash = (msg: string) => {
@@ -84,7 +84,6 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     window.setTimeout(() => setToast(''), 2200)
   }
   const save = (p: Plan) => repo.saveItem(trip.id, 'plans', p).catch(reportError)
-  const dayList = view === ALL ? [] : itemsOf(view)
   const sameOrder = (a: Plan[], b: Plan[]) => a.every((p, i) => p.id === b[i]?.id)
 
   const move = (index: number, delta: -1 | 1) => reindex(moveItem(dayList, index, delta)).forEach(save)
@@ -112,16 +111,10 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   const numberOf = (p: Plan) => itemsOf(isUndated(p) ? UNDATED : p.date).filter((x) => x.type === 'place').findIndex((x) => x.id === p.id) + 1
   const dayLabelOf = (p: Plan) => (isUndated(p) ? '날짜 미정' : `Day ${days.indexOf(p.date) + 1} · ${fmtDay(p.date)}`)
 
-  const tabs = [
-    { key: ALL, label: '전체' },
-    ...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })),
-    { key: UNDATED, label: '미정' },
-  ]
-  const addDate = view === ALL ? (days[0] ?? UNDATED) : view
-  const undatedCount = itemsOf(UNDATED).length
+  const tabs = [...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })), { key: UNDATED, label: '미정' }]
   // 시트에는 항상 최신 데이터 (일행이 고쳤을 수도 있으니)
   const sheetPlan = sheet?.plan ? (plans.find((p) => p.id === sheet.plan!.id) ?? sheet.plan) : null
-  const routeUrl = view !== ALL && view !== UNDATED ? googleRouteUrl(dayList) : null
+  const routeUrl = view !== UNDATED ? googleRouteUrl(dayList) : null
 
   return (
     <>
@@ -139,8 +132,8 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
         <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
           {tabs.map((t) => {
             const active = t.key === view
-            const n = t.key === ALL ? 0 : placeCount(itemsOf(t.key))
-            const dateText = t.key && t.key !== ALL ? ` ${fmtDay(t.key)}` : ''
+            const n = placeCount(itemsOf(t.key))
+            const dateText = t.key ? ` ${fmtDay(t.key)}` : ''
             return (
               <button
                 key={t.key || 'undated'}
@@ -165,121 +158,73 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
       </div>
 
       <div className="px-4">
-        {view === ALL ? (
-          <>
-            {days.map((d, i) => {
-              const items = itemsOf(d)
-              return (
-                <section key={d} className="pb-2 pt-3">
-                  <button type="button" onClick={() => setPicked(d)} className="flex w-full items-baseline justify-between pb-2 text-left">
-                    <span>
-                      <span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-[1px]" style={{ background: dayColor(i).bg }} aria-hidden="true" />
-                      <span className="text-[16px] font-bold">Day {i + 1}</span>
-                      <span className="ml-1.5 text-[14px] text-neutral-400">{fmtDay(d)}</span>
-                    </span>
-                    <span className="text-[13px] text-neutral-400">{placeCount(items)}곳 ›</span>
-                  </button>
-                  {items.length ? (
-                    <Timeline
-                      items={items}
-                      color={dayColor(i)}
-                      spent={spent}
-                      activeId={activeId}
-                      editing={false}
-                      onOpen={openItem}
-                      onFocus={(p) => setActiveId(p.id)}
-                      onMove={() => {}}
-                    />
-                  ) : (
-                    <button type="button" onClick={() => setSheet({ kind: 'place', plan: null, date: d })} className={`${addBtn} mb-2 w-full`}>
-                      + 이 날 갈 곳 추가
-                    </button>
-                  )}
-                </section>
-              )
-            })}
-            {undatedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 pb-2 pt-1">
+          <h2 className="min-w-0 truncate">
+            <span className="text-[16px] font-bold">{view === UNDATED ? '가고 싶은 곳' : `Day ${days.indexOf(view) + 1}`}</span>
+            <span className="ml-1.5 text-[14px] text-neutral-400">
+              {view === UNDATED ? '날짜 미정' : fmtDay(view)} · {placeCount(dayList)}곳
+            </span>
+          </h2>
+          <div className="flex shrink-0 items-center gap-1">
+            {!editing && routeUrl && (
+              <a href={routeUrl} target="_blank" rel="noopener noreferrer" className={btnGhost}>
+                동선 ↗
+              </a>
+            )}
+            {dayList.length > 1 && (
               <button
                 type="button"
-                onClick={() => setPicked(UNDATED)}
-                className={`${cardCls} mt-2 flex w-full items-center justify-between px-4 py-4 text-left`}
+                onClick={() => setEditing((v) => !v)}
+                className={`rounded-full px-2.5 py-1.5 text-[14px] font-medium ${editing ? 'font-bold text-neutral-900' : 'text-neutral-500'}`}
               >
-                <span className="text-[15px] font-bold">가고 싶은 곳</span>
-                <span className="text-[13px] text-neutral-400">{undatedCount}곳 ›</span>
+                {editing ? '완료' : '편집'}
               </button>
             )}
-            <div className="h-4" />
-          </>
+          </div>
+        </div>
+
+        {editing && (
+          <div className="mb-3 flex gap-2">
+            {view !== UNDATED && (
+              <button type="button" onClick={optimize} className={`${cardCls} flex-1 py-3 text-[13px] font-bold active:bg-neutral-50`}>
+                거리순 동선 정리
+              </button>
+            )}
+            <button type="button" onClick={timeSort} className={`${cardCls} flex-1 py-3 text-[13px] font-bold active:bg-neutral-50`}>
+              시간순 정리
+            </button>
+          </div>
+        )}
+
+        {dayList.length === 0 ? (
+          <Empty
+            icon="🗺️"
+            title={view === UNDATED ? '모아 둔 장소가 없어요' : '아직 일정이 없어요'}
+            desc="아래 버튼으로 갈 곳을 추가해 보세요"
+          />
         ) : (
-          <>
-            <div className="flex items-center justify-between gap-3 pb-2 pt-1">
-              <h2 className="min-w-0 truncate">
-                <span className="text-[16px] font-bold">{view === UNDATED ? '가고 싶은 곳' : `Day ${days.indexOf(view) + 1}`}</span>
-                <span className="ml-1.5 text-[14px] text-neutral-400">
-                  {view === UNDATED ? '날짜 미정' : fmtDay(view)} · {placeCount(dayList)}곳
-                </span>
-              </h2>
-              <div className="flex shrink-0 items-center gap-1">
-                {!editing && routeUrl && (
-                  <a href={routeUrl} target="_blank" rel="noopener noreferrer" className={btnGhost}>
-                    동선 ↗
-                  </a>
-                )}
-                {dayList.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setEditing((v) => !v)}
-                    className={`rounded-full px-2.5 py-1.5 text-[14px] font-medium ${editing ? 'font-bold text-neutral-900' : 'text-neutral-500'}`}
-                  >
-                    {editing ? '완료' : '편집'}
-                  </button>
-                )}
-              </div>
-            </div>
+          <Timeline
+            items={dayList}
+            color={colorOf(view)}
+            spent={spent}
+            activeId={activeId}
+            editing={editing}
+            onOpen={openItem}
+            onFocus={(p) => setActiveId(p.id)}
+            onMove={move}
+          />
+        )}
 
-            {editing && (
-              <div className="mb-3 flex gap-2">
-                {view !== UNDATED && (
-                  <button type="button" onClick={optimize} className={`${cardCls} flex-1 py-3 text-[13px] font-bold active:bg-neutral-50`}>
-                    거리순 동선 정리
-                  </button>
-                )}
-                <button type="button" onClick={timeSort} className={`${cardCls} flex-1 py-3 text-[13px] font-bold active:bg-neutral-50`}>
-                  시간순 정리
-                </button>
-              </div>
-            )}
-
-            {dayList.length === 0 ? (
-              <Empty
-                icon="🗺️"
-                title={view === UNDATED ? '모아 둔 장소가 없어요' : '아직 일정이 없어요'}
-                desc="아래 버튼으로 갈 곳을 추가해 보세요"
-              />
-            ) : (
-              <Timeline
-                items={dayList}
-                color={colorOf(view)}
-                spent={spent}
-                activeId={activeId}
-                editing={editing}
-                onOpen={openItem}
-                onFocus={(p) => setActiveId(p.id)}
-                onMove={move}
-              />
-            )}
-
-            {!editing && (
-              <div className="mb-4 mt-1 flex gap-2">
-                <button type="button" onClick={() => setSheet({ kind: 'place', plan: null })} className={`${addBtn} flex-[2]`}>
-                  + 장소 추가
-                </button>
-                <button type="button" onClick={() => setSheet({ kind: 'memo', plan: null })} className={`${addBtn} flex-1`}>
-                  + 메모
-                </button>
-              </div>
-            )}
-          </>
+        {/* 지금 보고 있는 날(또는 미정)에 추가된다 → 장소·메모 창에서 날짜를 따로 고르지 않음 */}
+        {!editing && (
+          <div className="mb-4 mt-1 flex gap-2">
+            <button type="button" onClick={() => setSheet({ kind: 'place', plan: null })} className={`${addBtn} flex-[2]`}>
+              + 장소 추가
+            </button>
+            <button type="button" onClick={() => setSheet({ kind: 'memo', plan: null })} className={`${addBtn} flex-1`}>
+              + 메모
+            </button>
+          </div>
         )}
       </div>
 
@@ -308,7 +253,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
         />
       )}
       {sheet?.kind === 'place' && (
-        <PlaceSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={sheet.date ?? addDate} onClose={() => setSheet(null)} />
+        <PlaceSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={view} onClose={() => setSheet(null)} />
       )}
       {sheet?.kind === 'expense' && sheetPlan && (
         <ExpenseSheet
@@ -324,7 +269,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
         />
       )}
       {sheet?.kind === 'memo' && (
-        <MemoSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={addDate} onClose={() => setSheet(null)} />
+        <MemoSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={view} onClose={() => setSheet(null)} />
       )}
     </>
   )

@@ -1,4 +1,4 @@
-import type { Category, Currency, Expense, PayMethod } from '../types'
+import type { Category, Currency, Expense, PayMethod, Plan } from '../types'
 
 /* ───────── ID ───────── */
 
@@ -66,6 +66,24 @@ export function ddayLabel(start: string, end: string): string {
 /** 월요일=0 … 일요일=6 (구글 영업시간 목록 순서) */
 export function mondayIndex(date: string): number {
   return (parse(date || todayStr()).getUTCDay() + 6) % 7
+}
+
+/** 시트 제목 아래에 보여 줄 날: "Day 2 · 12/6(일)" / "날짜 미정 · 가고 싶은 곳" */
+export function dayText(days: string[], d: string): string {
+  if (days.includes(d)) return `Day ${days.indexOf(d) + 1} · ${fmtDay(d)}`
+  return d ? fmtDay(d) : '날짜 미정 · 가고 싶은 곳'
+}
+
+/** 시간을 처음 고를 때 보여 줄 값: 그날 마지막 일정 1시간 뒤 (없으면 12:00) */
+export function suggestTime(plans: Plan[], date: string, exceptId?: string): string {
+  const last = plans
+    .filter((p) => p.id !== exceptId && p.date === date && p.time)
+    .map((p) => p.time)
+    .sort()
+    .pop()
+  if (!last) return '12:00'
+  const [h, m] = last.split(':').map(Number)
+  return `${String(Math.min(23, h + 1)).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`
 }
 
 /** 여행 기간 안이면 오늘, 아니면 첫날 */

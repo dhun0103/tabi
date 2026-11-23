@@ -14,20 +14,22 @@ interface Props {
 }
 
 /*
- * 왼쪽 세로선 위에 작은 번호 원, 장소와 장소 사이 선 위에 거리 알약(누르면 그 구간 길찾기)
- * 장소는 사진 없는 흰 카드: 굵은 이름 + "시간 · 종류 · 동네" 한 줄
+ * 왼쪽 세로선 위에 작은 번호 원 + 그 아래 시간 (NOL·트리플처럼), 장소와 장소 사이 선 위에 거리 알약(누르면 그 구간 길찾기)
+ * 장소는 사진 없는 흰 카드: 굵은 이름 + "종류 · 동네" 한 줄
  */
 
 const RAIL = 'w-12' // 왼쪽 선 칸 너비
 const CIRCLE_TOP = 18 // 번호 원 중심 높이(px) = 카드 제목 줄
+const TIME_TOP = 32 // 시간 글자 위쪽 (번호 원 바로 아래)
+const TIME_GAP = 32 // 시간이 있으면 아래 선을 이만큼 띄워서 글자와 겹치지 않게
 
-/** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 */
-function Rail(props: { top: boolean; bottom: boolean; center?: number; children?: ReactNode }) {
+/** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 (gap: 가운데 아래로 선을 비울 길이) */
+function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: number; children?: ReactNode }) {
   const c = props.center ?? CIRCLE_TOP
   return (
     <div className={`relative ${RAIL} shrink-0`}>
       {props.top && <span className="absolute left-1/2 top-0 w-px -translate-x-1/2 bg-neutral-300" style={{ height: c }} />}
-      {props.bottom && <span className="absolute bottom-0 left-1/2 w-px -translate-x-1/2 bg-neutral-300" style={{ top: c }} />}
+      {props.bottom && <span className="absolute bottom-0 left-1/2 w-px -translate-x-1/2 bg-neutral-300" style={{ top: c + (props.gap ?? 0) }} />}
       {props.children}
     </div>
   )
@@ -95,13 +97,21 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     n += 1
     const num = n
     const pinned = hasCoords(p)
-    const meta = [p.time, p.kind, p.area].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
+    const meta = [p.kind, p.area].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
     const money = spent?.get(p.id)
     const active = p.id === activeId
     // 첫 줄 위쪽 선은 앞에 메모가 있을 때만, 아래쪽 선은 뒤에 뭔가 있을 때만
     rows.push(
       <li key={p.id} id={`plan-${p.id}`} className={`-mx-4 flex px-4 transition-colors ${active ? 'bg-[#ECF4FF]' : ''}`}>
-        <Rail top={!first} bottom={!last}>
+        <Rail top={!first} bottom={!last} gap={p.time ? TIME_GAP : 0}>
+          {p.time && (
+            <span
+              className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold tabular-nums leading-none text-neutral-500"
+              style={{ top: TIME_TOP }}
+            >
+              {p.time}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => pinned && onFocus(p)}

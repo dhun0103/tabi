@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { byOrder } from '../../lib/order'
 import { cachedJpyRate, fetchJpyRate } from '../../lib/rate'
-import { CATEGORIES, METHODS, defaultDay, fmtDay, fmtKRW, newId, toKRW } from '../../lib/util'
+import { CATEGORIES, METHODS, dayText, defaultDay, fmtDay, fmtKRW, newId, toKRW, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Category, Currency, Expense, PayMethod, Plan, Trip } from '../../types'
 import { RateField } from '../RateField'
@@ -29,19 +28,22 @@ interface Props {
   onClose: () => void
 }
 
-/** 지출 입력·수정. 가계부 탭에서도, 일정의 장소에서도 연다 */
+/**
+ * 지출 입력·수정. 가계부 탭에서도, 일정의 장소에서도 연다
+ * 날짜·연결된 장소는 연 곳에서 정해지고(가계부의 Day 칸, 장소 카드) 창에서는 고르지 않는다
+ */
 export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) {
   const group = trip.members.length >= 2
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'JPY')
   const [category, setCategory] = useState<Category>(initial?.category ?? prefill?.category ?? 'food')
   const [title, setTitle] = useState(initial?.title ?? prefill?.title ?? '')
-  const [date, setDate] = useState(initial?.date || prefill?.date || defaultDay(trip.startDate, trip.endDate))
-  const [planId, setPlanId] = useState(initial?.planId ?? prefill?.planId ?? '')
+  const date = initial?.date || prefill?.date || defaultDay(trip.startDate, trip.endDate)
+  const planId = initial?.planId ?? prefill?.planId ?? ''
+  const memo = initial?.memo ?? '' // 메모 칸은 없앰 (예전에 적은 메모는 그대로 둠)
   const [method, setMethod] = useState<PayMethod>(initial?.method ?? 'card')
   const [payer, setPayer] = useState(initial?.payer ?? trip.members[0] ?? '')
   const [shared, setShared] = useState(initial?.shared ?? true)
-  const [memo, setMemo] = useState(initial?.memo ?? '')
   const [error, setError] = useState('')
 
   /* ── 환율: 지출을 적는 순간의 환율을 이 지출에 저장 (트리플처럼) ── */
@@ -96,8 +98,10 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
   const value = Number(amount.replace(/[^0-9.]/g, ''))
   const payers = payer && !trip.members.includes(payer) ? [...trip.members, payer] : trip.members
   const linked = plans.find((p) => p.id === planId)
-  // 고른 날짜의 장소들 (+ 이미 연결된 장소가 다른 날이면 그것도)
-  const placeOptions = plans.filter((p) => p.type === 'place' && (p.date === date || p.id === planId)).sort(byOrder)
+  // 제목 아래: 어느 날(가계부 칸과 같은 이름) + 연결된 장소
+  const when =
+    date < trip.startDate ? `여행 준비 · ${fmtDay(date)}` : date > trip.endDate ? `여행 후 · ${fmtDay(date)}` : dayText(tripDays(trip.startDate, trip.endDate), date)
+  const where = linked && initial ? `📍 ${linked.title}` : '' // 장소에서 열었을 땐 제목에 이미 장소 이름이 있음
 
   const save = () => {
     if (!(value > 0)) {
@@ -127,7 +131,7 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
       method,
       payer: group ? payer : (trip.members[0] ?? ''),
       shared: group ? shared : true,
-      memo: memo.trim(),
+      memo,
       planId,
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
@@ -145,6 +149,7 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
   return (
     <Sheet
       title={initial ? '지출 수정' : linked ? `${linked.title}에서 쓴 돈` : '지출 추가'}
+      subtitle={<p className="truncate text-[13px] text-neutral-500">{[when, where].filter(Boolean).join(' · ')}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -230,30 +235,13 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 히츠마부시 2인, 입장권" className={inputCls} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="날짜">
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-        </Field>
-        <Group label="결제">
-          {METHODS.map((m) => (
-            <Chip key={m.id} active={method === m.id} onClick={() => setMethod(m.id)}>
-              {m.label}
-            </Chip>
-          ))}
-        </Group>
-      </div>
-
-      <Field label="일정 장소 (선택)" hint="장소에 연결하면 일정에서 그 장소에 쓴 돈이 같이 보여요">
-        <select value={planId} onChange={(e) => setPlanId(e.target.value)} className={inputCls}>
-          <option value="">연결 안 함</option>
-          {placeOptions.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.time ? `${p.time} · ` : ''}
-              {p.title}
-            </option>
-          ))}
-        </select>
-      </Field>
+      <Group label="결제">
+        {METHODS.map((m) => (
+          <Chip key={m.id} active={method === m.id} onClick={() => setMethod(m.id)}>
+            {m.label}
+          </Chip>
+        ))}
+      </Group>
 
       {group && (
         <>
@@ -274,10 +262,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
           </Group>
         </>
       )}
-
-      <Field label="메모 (선택)">
-        <input value={memo} onChange={(e) => setMemo(e.target.value)} className={inputCls} />
-      </Field>
     </Sheet>
   )
 }

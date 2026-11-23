@@ -8,7 +8,6 @@ interface Props {
   onChange: (v: string) => void
   hint: ReactNode // 평소 안내 문구
   label?: string
-  autoFill?: boolean // 처음 열 때 비어 있으면 최신 환율로 채우기 (새 여행 만들기)
   needsSave?: boolean // 불러온 뒤 [저장]을 눌러야 반영되는 화면 (설정)
   onPicked?: (r: JpyRate | null) => void // 불러온 환율로 채웠으면 그 정보, 사람이 직접 고쳤으면 null
 }
@@ -30,24 +29,19 @@ export function RateCredit({ source }: { source: JpyRate['source'] }) {
  * 환율 입력칸 + [오늘 환율] 버튼
  *   버튼 → 최신 시장 환율로 칸을 채움 → 환전·카드 환율이 있으면 사람이 고쳐 씀
  */
-export function RateField({ value, onChange, hint, label = '환율 (100엔 = ?원)', autoFill = false, needsSave = false, onPicked }: Props) {
-  const [status, setStatus] = useState<Status>(autoFill && !value ? 'loading' : 'idle')
+export function RateField({ value, onChange, hint, label = '환율 (100엔 = ?원)', needsSave = false, onPicked }: Props) {
+  const [status, setStatus] = useState<Status>('idle')
   const [info, setInfo] = useState<JpyRate | null>(null)
-  // 불러오는 동안 사람이 직접 적었으면 덮어쓰지 않으려고 최신 값을 따로 들고 있음
-  const latest = useRef({ value, onChange, onPicked })
+  // 불러오는 동안 부모가 다시 그려져도 최신 onChange·onPicked를 쓰려고 따로 들고 있음
+  const latest = useRef({ onChange, onPicked })
   useEffect(() => {
-    latest.current = { value, onChange, onPicked }
+    latest.current = { onChange, onPicked }
   })
 
-  const load = async (auto: boolean) => {
+  const load = async () => {
     setStatus('loading')
     try {
       const r = await fetchJpyRate()
-      if (auto && latest.current.value.trim()) {
-        // 이미 채워져 있음(사람이 적었거나 먼저 끝난 불러오기) → 안내 문구는 그대로 둠
-        setStatus((s) => (s === 'loading' ? 'idle' : s))
-        return
-      }
       latest.current.onChange(String(r.per100))
       latest.current.onPicked?.(r)
       setInfo(r)
@@ -56,11 +50,6 @@ export function RateField({ value, onChange, hint, label = '환율 (100엔 = ?�
       setStatus('error')
     }
   }
-
-  // 처음 열 때 한 번만
-  useEffect(() => {
-    if (autoFill && !latest.current.value.trim()) void load(true)
-  }, [])
 
   const note =
     status === 'loading' ? (
@@ -93,7 +82,7 @@ export function RateField({ value, onChange, hint, label = '환율 (100엔 = ?�
         />
         <button
           type="button"
-          onClick={() => void load(false)}
+          onClick={() => void load()}
           disabled={status === 'loading'}
           className="shrink-0 rounded-xl border border-neutral-200 bg-white px-3.5 text-sm font-medium text-neutral-700 active:bg-neutral-50 disabled:opacity-40"
         >

@@ -3,6 +3,7 @@ import { parseBackup, type Backup } from '../lib/backup'
 import { shareLink, todayStr } from '../lib/util'
 import { repo } from '../store'
 import type { Expense, Plan, Trip } from '../types'
+import { MembersField, addName } from './MembersField'
 import { RateField } from './RateField'
 import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
 
@@ -23,20 +24,13 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
   const fileRef = useRef<HTMLInputElement>(null)
   const link = shareLink(trip.id)
 
-  const addMember = () => {
-    const n = newMember.trim()
-    if (n && !members.includes(n)) setMembers([...members, n])
-    setNewMember('')
-  }
-
   const save = () => {
     const r = Number(rate)
     if (!name.trim()) return setMsg('여행 이름을 적어 주세요')
     if (!start) return setMsg('시작일을 골라 주세요')
     if (end && end < start) return setMsg('종료일이 시작일보다 빨라요')
     if (!(r > 0)) return setMsg('환율을 확인해 주세요 (100엔 = ?원)')
-    const n = newMember.trim()
-    const nextMembers = n && !members.includes(n) ? [...members, n] : members
+    const nextMembers = addName(members, newMember) // [추가]를 안 누르고 적어만 둔 이름도 넣음
     setMembers(nextMembers)
     setNewMember('')
     repo
@@ -126,37 +120,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
           needsSave
           hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 환율을 못 불러올 때와 환율이 저장 안 된 예전 지출에만 써요."
         />
-        <div>
-          <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">일행</span>
-          <div className="flex flex-wrap gap-1.5">
-            {members.map((m) => (
-              <span key={m} className="inline-flex items-center gap-1 rounded-full bg-neutral-100 py-1.5 pl-3.5 pr-1.5 text-sm">
-                {m}
-                <button
-                  type="button"
-                  onClick={() => setMembers(members.filter((x) => x !== m))}
-                  aria-label={`${m} 빼기`}
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-xs text-neutral-400 active:bg-neutral-200"
-                >
-                  ✕
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={newMember}
-              onChange={(e) => setNewMember(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addMember()}
-              placeholder="이름 추가"
-              aria-label="일행 이름 추가"
-              className={inputCls}
-            />
-            <button type="button" onClick={addMember} className="shrink-0 rounded-xl border border-neutral-200 px-4 text-sm font-medium text-neutral-700">
-              추가
-            </button>
-          </div>
-        </div>
+        <MembersField members={members} onChange={setMembers} draft={newMember} onDraft={setNewMember} />
         <button type="button" onClick={save} className={btnPrimary}>
           저장
         </button>

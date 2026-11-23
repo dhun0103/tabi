@@ -1,18 +1,30 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { cachedJpyRate, fetchJpyRate } from '../lib/rate'
 import { loadRecent } from '../lib/session'
 import { fmtDay, newId, parseTripId } from '../lib/util'
 import { repo } from '../store'
 import type { Trip } from '../types'
-import { RateField } from './RateField'
+import { MembersField, addName } from './MembersField'
 import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
 
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 const isStandalone = () =>
   matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true
 
-function parseMembers(s: string): string[] {
-  const list = [...new Set(s.split(/[,，、]/).map((x) => x.trim()).filter(Boolean))]
-  return list.length ? list : ['나']
+/**
+ * 여행의 기본 환율 (만들기 화면에선 묻지 않음): 받아 둔 최신 환율 → 없으면 3초만 기다려 받아 보고 → 그래도 안 되면 대략값
+ * 지출마다 그때 환율이 따로 저장되니, 이 값은 환율을 못 불러올 때만 쓰임. 설정에서 고칠 수 있음
+ */
+const FALLBACK_PER100 = 900
+async function defaultRate(): Promise<number> {
+  const cached = cachedJpyRate()
+  if (cached) return cached.per100
+  try {
+    const r = await Promise.race([fetchJpyRate(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))])
+    return r.per100
+  } catch {
+    return FALLBACK_PER100
+  }
 }
 
 /** 여행이 선택되지 않았을 때: 새 여행 만들기 / 링크로 참여 / 최근 여행 */
@@ -21,26 +33,32 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
   const [name, setName] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
-  const [rate, setRate] = useState('')
-  const [members, setMembers] = useState('')
+  const [members, setMembers] = useState<string[]>(['나'])
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
   const [link, setLink] = useState('')
   const [error, setError] = useState('')
   const [joinError, setJoinError] = useState('')
 
-  const create = () => {
-    const r = Number(rate)
+  // 화면을 여는 동안 최신 환율을 미리 받아 둠 (만들기를 누를 땐 바로 씀)
+  useEffect(() => {
+    fetchJpyRate().catch(() => {})
+  }, [])
+
+  const create = async () => {
     if (!name.trim()) return setError('여행 이름을 적어 주세요')
     if (!start) return setError('시작일을 골라 주세요')
     if (end && end < start) return setError('종료일이 시작일보다 빨라요')
-    if (!(r > 0)) return setError('환율을 적어 주세요 (100엔 = ?원)')
+    setBusy(true)
+    const list = addName(members, draft) // [추가]를 안 누르고 적어만 둔 이름도 넣음
     const now = Date.now()
     const trip: Trip = {
       id: newId(),
       name: name.trim(),
       startDate: start,
       endDate: end || start,
-      krwPer100Jpy: r,
-      members: parseMembers(members),
+      krwPer100Jpy: await defaultRate(),
+      members: list.length ? list : ['나'],
       createdAt: now,
       updatedAt: now,
     }
@@ -113,19 +131,10 @@ export function Onboarding({ onOpen }: { onOpen: (id: string) => void }) {
               <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
             </Field>
           </div>
-          <RateField
-            label="기본 환율 (100엔 = ?원)"
-            value={rate}
-            onChange={setRate}
-            autoFill
-            hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 인터넷이 안 될 때 쓰는 기본값이에요."
-          />
-          <Field label="일행 (선택, 쉼표로 구분)" hint="2명 이상이면 가계부에 1인당 금액이 나와요">
-            <input value={members} onChange={(e) => setMembers(e.target.value)} placeholder="예: 나, 민수, 지영" className={inputCls} />
-          </Field>
+          <MembersField members={members} onChange={setMembers} draft={draft} onDraft={setDraft} hint="같이 가는 사람을 한 명씩 추가하세요. 2명 이상이면 가계부에 1인당 금액이 나와요." />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <button type="button" onClick={create} className={btnPrimary}>
-            여행 만들기
+          <button type="button" onClick={() => void create()} disabled={busy} className={btnPrimary}>
+            {busy ? '만드는 중…' : '여행 만들기'}
           </button>
         </section>
 

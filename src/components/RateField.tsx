@@ -6,7 +6,7 @@ import { Field, inputCls } from './ui'
 interface Props {
   value: string
   onChange: (v: string) => void
-  hint: ReactNode // 평소 안내 문구
+  hint?: ReactNode // 평소 안내 문구 (없으면 비워 둠. [오늘 환율]을 누른 뒤엔 기준 날짜·출처 안내가 나옴)
   label?: string
   needsSave?: boolean // 불러온 뒤 [저장]을 눌러야 반영되는 화면 (설정)
   onPicked?: (r: JpyRate | null) => void // 불러온 환율로 채웠으면 그 정보, 사람이 직접 고쳤으면 null

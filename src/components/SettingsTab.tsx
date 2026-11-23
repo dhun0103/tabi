@@ -113,13 +113,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
             <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
           </Field>
         </div>
-        <RateField
-          label="기본 환율 (100엔 = ?원)"
-          value={rate}
-          onChange={setRate}
-          needsSave
-          hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 환율을 못 불러올 때와 환율이 저장 안 된 예전 지출에만 써요."
-        />
+        <RateField label="기본 환율 (100엔 = ?원)" value={rate} onChange={setRate} needsSave />
         <MembersField members={members} onChange={setMembers} draft={newMember} onDraft={setNewMember} />
         <button type="button" onClick={save} className={btnPrimary}>
           저장

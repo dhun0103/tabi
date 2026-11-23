@@ -10,8 +10,9 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      // 새 버전을 배포하면 다음 실행 때 자동으로 교체
-      registerType: 'autoUpdate',
+      // 새 버전을 배포하면 뒤에서 받아 두고 "새 버전이 나왔어요 [새로고침]" 배너 (UpdateBanner)
+      // 누르면 바로 교체, 안 누르면 앱을 완전히 껐다 켤 때 교체 (입력 중 갑자기 새로고침되지 않게)
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'logo.svg'],
       manifest: {
         name: 'tabi — 여행 일정·지도·가계부',

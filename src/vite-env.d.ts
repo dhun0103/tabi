@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 /// <reference types="google.maps" />
+/// <reference types="vite-plugin-pwa/react" />
 
 interface ImportMetaEnv {
   readonly VITE_FIREBASE_API_KEY?: string

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { distanceM, fmtDistance, googleLegUrl, hasCoords, travelHint } from '../../lib/geo'
 import type { Plan } from '../../types'
+import { MemoIcon } from '../icons'
+import { BLUE } from '../ui'
 
 interface Props {
   items: Plan[] // 순서대로 정렬된 하루치
@@ -15,8 +17,9 @@ interface Props {
 
 /*
  * 왼쪽 세로선 위에 작은 번호 원 + 그 아래 시간 (NOL·트리플처럼), 장소와 장소 사이 선 위에 거리 알약(누르면 그 구간 길찾기)
- * 장소는 사진 없는 흰 카드: 굵은 이름 + "종류 · 동네" 한 줄
+ * 장소는 사진 없는 흰 카드: 굵은 이름 + "종류 · 동네" 한 줄 (+ 장소 메모는 ≡ 아이콘을 붙여서)
  * 번호 원은 카드 제목 줄, 시간은 카드 둘째 줄과 같은 높이 → 아래 숫자들은 카드 여백·줄 높이에서 나옴
+ * 일정 사이 메모는 장소와 같은 흰 카드에 글만 ("메모" 글자 없이) + 선 위 파란 점 (NOL처럼)
  */
 
 const RAIL = 'w-12' // 왼쪽 선 칸 너비
@@ -26,6 +29,8 @@ const META_LH = 20 // 둘째 줄 높이 (leading-5)
 const CIRCLE_TOP = PAD_TOP + TITLE_LH / 2 // 번호 원 중심 = 제목 줄 가운데
 const TIME_TOP = PAD_TOP + TITLE_LH + 2 // 시간 칸 위쪽 = 둘째 줄 위쪽 (mt-0.5)
 const TIME_GAP = TIME_TOP + META_LH - CIRCLE_TOP // 시간이 있으면 시간 칸 아래부터 선을 다시 그림
+// 장소·메모 공통 흰 카드 (메모 글줄도 제목 줄과 같은 22px라서 메모 점이 번호 원과 같은 높이에 옴)
+const CARD = 'block min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-left shadow-[0_1px_3px_rgba(16,24,40,0.08)] ring-1 ring-black/[0.03] active:bg-neutral-50'
 
 /** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 (gap: 가운데 아래로 선을 비울 길이) */
 function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: number; children?: ReactNode }) {
@@ -57,17 +62,11 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     if (p.type === 'memo') {
       rows.push(
         <li key={p.id} id={`plan-${p.id}`} className="flex">
-          {/* 점 중심 27 = 줄 위 여백 6 + 테두리 1 + 안쪽 여백 10 + 첫 줄(20)의 가운데 10 */}
-          <Rail top={!first} bottom={!last} center={27}>
-            <span className="absolute left-1/2 top-[23px] h-2 w-2 -translate-x-1/2 rounded-full bg-neutral-300" />
+          <Rail top={!first} bottom={!last}>
+            <span className="absolute left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ top: CIRCLE_TOP, background: BLUE }} />
           </Rail>
           <div className="flex min-w-0 flex-1 py-1.5">
-            <button
-              type="button"
-              onClick={() => onOpen(p)}
-              className="min-w-0 flex-1 whitespace-pre-wrap rounded-xl border border-dashed border-neutral-300 bg-white/60 px-4 py-2.5 text-left text-[13px] leading-5 text-neutral-600"
-            >
-              <span className="mr-1.5 font-semibold text-neutral-800">메모</span>
+            <button type="button" onClick={() => onOpen(p)} aria-label={`메모: ${p.title}`} className={`${CARD} whitespace-pre-wrap text-[15px] leading-[22px] text-neutral-800`}>
               {p.title}
             </button>
             {arrows}
@@ -131,11 +130,7 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
           </button>
         </Rail>
         <div className="flex min-w-0 flex-1 py-1.5">
-          <button
-            type="button"
-            onClick={() => onOpen(p)}
-            className="block min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-left shadow-[0_1px_3px_rgba(16,24,40,0.08)] ring-1 ring-black/[0.03] active:bg-neutral-50"
-          >
+          <button type="button" onClick={() => onOpen(p)} className={CARD}>
             <span className="flex items-start gap-2">
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{p.title}</span>
@@ -144,7 +139,13 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
               </span>
               {money && <span className="shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-neutral-700">{money}</span>}
             </span>
-            {p.memo && <span className="mt-1.5 line-clamp-2 block whitespace-pre-wrap text-[13px] leading-relaxed text-neutral-500">{p.memo}</span>}
+            {p.memo && (
+              // 장소 메모: ≡ 아이콘으로 메모인 걸 표시 (NOL처럼), 종류·동네보다 진하게
+              <span className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-5 text-neutral-700">
+                <MemoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+                <span className="line-clamp-2 min-w-0 whitespace-pre-wrap">{p.memo}</span>
+              </span>
+            )}
           </button>
           {arrows}
         </div>

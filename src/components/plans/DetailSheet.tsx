@@ -4,7 +4,7 @@ import { shrinkPhoto } from '../../lib/photo'
 import { categoryOf, expenseKRW, fmtKRW, fmtMoney, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
-import { CategoryIcon } from '../icons'
+import { CategoryIcon, MemoIcon } from '../icons'
 import { TimeDialog } from '../TimePicker'
 import { MINT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
 
@@ -71,7 +71,7 @@ export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdat
           </div>
         ) : (
           <Row
-            icon={<MemoIcon />}
+            icon={<MemoIcon className={iconCls} />}
             label="메모"
             onClick={() => {
               setMemoText(plan.memo)
@@ -264,11 +264,6 @@ const ClockIcon = () => (
   <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
     <circle cx="12" cy="12" r="8.5" />
     <path d="M12 7.5V12l3 2" />
-  </svg>
-)
-const MemoIcon = () => (
-  <svg viewBox="0 0 24 24" className={iconCls} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
-    <path d="M5 7h14M5 12h14M5 17h9" />
   </svg>
 )
 const CameraIcon = () => (

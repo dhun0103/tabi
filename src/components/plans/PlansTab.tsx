@@ -21,8 +21,8 @@ type SheetState =
   | { kind: 'expense'; plan: Plan; expense: Expense | null }
   | null
 
-const addBtn =
-  'flex items-center justify-center gap-1.5 rounded-2xl border border-dashed border-neutral-300 bg-white/70 py-3.5 text-[14px] font-semibold text-neutral-600 active:bg-white'
+// 맨 아래 [메모 추가] [장소 추가]: 같은 너비, 흰 바탕 + 연한 테두리 (NOL처럼)
+const addBtn = 'rounded-lg border border-neutral-200 bg-white py-3 text-[15px] font-semibold text-neutral-700 active:bg-neutral-50'
 
 export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[]; expenses: Expense[] }) {
   const days = useMemo(() => tripDays(trip.startDate, trip.endDate), [trip.startDate, trip.endDate])
@@ -226,12 +226,12 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
         {/* 지금 보고 있는 날(또는 미정)에 추가된다 → 장소·메모 창에서 날짜를 따로 고르지 않음 */}
         {!editing && (
-          <div className="mb-4 mt-1 flex gap-2">
-            <button type="button" onClick={() => setSheet({ kind: 'place', plan: null })} className={`${addBtn} flex-[2]`}>
-              + 장소 추가
+          <div className="mb-4 mt-2 grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setSheet({ kind: 'memo', plan: null })} className={addBtn}>
+              메모 추가
             </button>
-            <button type="button" onClick={() => setSheet({ kind: 'memo', plan: null })} className={`${addBtn} flex-1`}>
-              + 메모
+            <button type="button" onClick={() => setSheet({ kind: 'place', plan: null })} className={addBtn}>
+              장소 추가
             </button>
           </div>
         )}

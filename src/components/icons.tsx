@@ -91,3 +91,12 @@ export function KindIcon({ kind, className = 'h-5 w-5' }: { kind: string; classN
     </svg>
   )
 }
+
+/** 메모 표시 (줄 세 개, NOL·트리플 일정의 장소 메모처럼) — 장소 카드 창과 타임라인에서 같이 씀 */
+export function MemoIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true">
+      <path d="M5 7h14M5 12h14M5 17h9" />
+    </svg>
+  )
+}

@@ -4,7 +4,7 @@ import { CATEGORIES, METHODS, dayText, defaultDay, fmtDay, fmtKRW, newId, toKRW,
 import { repo } from '../../store'
 import type { Category, Currency, Expense, PayMethod, Plan, Trip } from '../../types'
 import { RateField } from '../RateField'
-import { BLUE, Chip, Field, Group, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
+import { Chip, Field, Group, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
 /**
  * 이 지출의 환율이 어디서 왔나
@@ -56,7 +56,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
   const [rate, setRate] = useState(rateInit.text)
   const [rateDate, setRateDate] = useState(rateInit.date)
   const [rateKind, setRateKind] = useState<RateKind>(rateInit.kind)
-  const [rateOpen, setRateOpen] = useState(false)
   const rateTouched = useRef(false) // 사람이 환율을 고쳤으면 불러온 값으로 덮어쓰지 않음
 
   useEffect(() => {
@@ -82,16 +81,19 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
   const rateNum = Number(rate) > 0 ? Number(rate) : tripRate
   // 저장할 때 이 지출에 환율을 고정하나 (예전 지출·못 불러온 경우는 여행 기본 환율을 따라감)
   const fixesRate = rateKind === 'latest' || rateKind === 'saved' || rateKind === 'manual'
-  const rateLabel =
+  // 환율 칸 아래 안내: 이 환율이 어디서 왔나
+  const rateHint =
     rateKind === 'loading'
-      ? '최신 환율 불러오는 중…'
-      : rateKind === 'legacy'
-        ? '여행 기본 환율'
-        : rateKind === 'fallback'
-          ? '여행 기본 환율 (최신 환율을 못 불러옴)'
-          : rateKind === 'manual' || !rateDate
-            ? '직접 넣은 환율'
-            : `${fmtDay(rateDate)} 기준`
+      ? '최신 환율을 불러오는 중…'
+      : rateKind === 'latest'
+        ? `${rateDate ? `${fmtDay(rateDate)} 기준 ` : ''}시장 환율이에요. 카드·환전 환율로 고쳐도 돼요.`
+        : rateKind === 'saved'
+          ? `이 지출에 저장된 환율이에요${rateDate ? ` (${fmtDay(rateDate)} 기준)` : ''}.`
+          : rateKind === 'manual'
+            ? '직접 넣은 환율이에요. 이 지출에만 적용돼요.'
+            : rateKind === 'legacy'
+              ? '예전 지출이라 여행 기본 환율로 계산하고 있어요. 고치면 이 지출에 저장돼요.'
+              : '최신 환율을 못 불러와서 여행 기본 환율을 넣었어요.'
 
   const value = Number(amount.replace(/[^0-9.]/g, ''))
   const linked = plans.find((p) => p.id === planId)
@@ -110,7 +112,6 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
       return
     }
     if (currency === 'JPY' && rate.trim() && !(Number(rate) > 0)) {
-      setRateOpen(true)
       setError('환율을 확인해 주세요 (100엔 = ?원)')
       return
     }
@@ -189,24 +190,17 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
             autoFocus={!initial}
           />
         </div>
-        {currency === 'JPY' ? (
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            {/* 이 지출에 쓸 환율 (눌러서 고치기) */}
-            <button type="button" onClick={() => setRateOpen((v) => !v)} className="flex min-w-0 items-center gap-1.5 py-1 text-left text-xs text-neutral-400">
-              <span className="truncate">{rateKind === 'loading' ? rateLabel : `100엔 = ${rateNum.toLocaleString('ko-KR')}원 · ${rateLabel}`}</span>
-              <span className="shrink-0 font-semibold" style={{ color: BLUE }}>
-                {rateOpen ? '닫기' : '수정'}
-              </span>
-            </button>
-            {value > 0 && <span className="shrink-0 text-[15px] font-semibold tabular-nums text-neutral-700">≈ {fmtKRW(toKRW(value, 'JPY', rateNum))}</span>}
-          </div>
-        ) : (
-          <div className="mt-1.5 h-7" />
-        )}
+        {/* 금액 바로 아래: 왼쪽 오류, 오른쪽 원화로 얼마인지 (높이를 고정해서 숫자를 쳐도 화면이 안 밀림) */}
+        <div className="mt-1.5 flex min-h-6 items-center justify-between gap-2">
+          <span className="text-sm text-red-600" role="alert">
+            {error}
+          </span>
+          {currency === 'JPY' && value > 0 && <span className="shrink-0 text-[15px] font-semibold tabular-nums text-neutral-700">≈ {fmtKRW(toKRW(value, 'JPY', rateNum))}</span>}
+        </div>
       </div>
-      {currency === 'JPY' && rateOpen && (
+      {/* 엔화면 환율 칸을 늘 보여 줌 (지출마다 그때 환율이 저장됨) */}
+      {currency === 'JPY' && (
         <RateField
-          label="이 지출의 환율 (100엔 = ?원)"
           value={rate}
           onChange={setRate}
           onPicked={(r) => {
@@ -215,10 +209,9 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
             setRateKind(r ? 'latest' : 'manual')
             setError('')
           }}
-          hint="카드 명세서나 환전한 환율로 고치면 더 정확해요. 이 지출에만 적용돼요."
+          hint={rateHint}
         />
       )}
-      {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
 
       <Group label="카테고리">
         {CATEGORIES.map((c) => (

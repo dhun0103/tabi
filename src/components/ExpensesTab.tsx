@@ -4,13 +4,13 @@ import {
   METHODS,
   addDays,
   categoryOf,
+  expenseKRW,
   fmtDay,
   fmtJPY,
   fmtKRW,
   fmtMoney,
   settle,
   todayStr,
-  toKRW,
   tripDays,
 } from '../lib/util'
 import type { Expense, Plan, Trip } from '../types'
@@ -32,8 +32,8 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
   const days = useMemo(() => tripDays(trip.startDate, trip.endDate), [trip.startDate, trip.endDate])
   const [filter, setFilter] = useState('all')
   const [sheet, setSheet] = useState<SheetState>(null)
-  const rate = trip.krwPer100Jpy
-  const krw = (e: Expense) => toKRW(e.amount, e.currency, rate)
+  const rate = trip.krwPer100Jpy // 기본 환율: 환율이 저장 안 된 예전 지출에만 쓰임
+  const krw = (e: Expense) => expenseKRW(e, rate) // 지출마다 적을 때의 환율
   const group = trip.members.length >= 2
 
   const bucketOf = (e: Expense) => (!e.date || e.date < trip.startDate ? 'pre' : e.date > trip.endDate ? 'post' : e.date)
@@ -104,7 +104,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
           <p className="text-[13px] text-neutral-500">{filter === 'all' ? '총 지출' : `${sections.find((s) => s.key === filter)?.title} 지출`}</p>
           <p className="mt-1 text-[34px] font-extrabold leading-tight tracking-tight">{fmtKRW(total)}</p>
           <p className="mt-1 text-[13px] text-neutral-500">
-            엔화 {fmtJPY(jpy)} <span className="text-neutral-300">·</span> 100엔 = {rate.toLocaleString('ko-KR')}원
+            엔화 {fmtJPY(jpy)}
             {settlement && settlement.total > 0 && (
               <>
                 {' '}
@@ -248,7 +248,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
 
 /** 카테고리별 지출 (한 가지 색 막대, 큰 것부터) */
 function StatsSheet({ expenses, rate, onClose }: { expenses: Expense[]; rate: number; onClose: () => void }) {
-  const krw = (e: Expense) => toKRW(e.amount, e.currency, rate)
+  const krw = (e: Expense) => expenseKRW(e, rate)
   const total = sum(expenses.map(krw))
   const rows = CATEGORIES.map((c) => ({ ...c, value: sum(expenses.filter((e) => e.category === c.id).map(krw)) }))
     .filter((c) => c.value > 0)

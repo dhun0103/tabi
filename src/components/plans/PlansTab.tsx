@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NEUTRAL_COLOR, centerOf, dayColor, googleRouteUrl, hasCoords, type LatLng } from '../../lib/geo'
 import { byOrder, moveItem, optimizeRoute, reindex, sortByTime } from '../../lib/order'
-import { categoryFromKind, fmtDay, fmtJPY, fmtKRW, todayStr, toKRW, tripDays } from '../../lib/util'
+import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Plan, Trip } from '../../types'
 import { ExpenseSheet } from '../expenses/ExpenseSheet'
@@ -51,7 +51,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
       e.planId,
       list.every((x) => x.currency === 'JPY')
         ? fmtJPY(list.reduce((a, x) => a + x.amount, 0))
-        : fmtKRW(list.reduce((a, x) => a + toKRW(x.amount, x.currency, trip.krwPer100Jpy), 0)),
+        : fmtKRW(list.reduce((a, x) => a + expenseKRW(x, trip.krwPer100Jpy), 0)),
     )
   }
 

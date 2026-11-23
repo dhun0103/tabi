@@ -55,12 +55,17 @@ export function normalizeExpense(x: unknown): Expense | null {
   if (!okId(o.id) || !(amount > 0)) return null
   const now = Date.now()
   const category = CATEGORIES.find((c) => c.id === o.category)?.id ?? 'etc'
+  const currency = o.currency === 'KRW' ? 'KRW' : 'JPY'
+  const rate = currency === 'JPY' ? num(o.krwPer100Jpy, 0) : 0
   return {
     id: o.id,
     date: str(o.date),
     title: str(o.title),
     amount,
-    currency: o.currency === 'KRW' ? 'KRW' : 'JPY',
+    currency,
+    // 예전 데이터엔 없음 → 0 (여행 기본 환율로 계산)
+    krwPer100Jpy: rate > 0 ? rate : 0,
+    rateDate: rate > 0 ? str(o.rateDate) : '',
     category,
     method: o.method === 'cash' ? 'cash' : 'card',
     payer: str(o.payer),

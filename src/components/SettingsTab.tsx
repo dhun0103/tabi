@@ -119,7 +119,13 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
             <input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} className={inputCls} />
           </Field>
         </div>
-        <RateField value={rate} onChange={setRate} needsSave hint="실제로 환전·충전한 환율이나 카드 환율로 넣으면 원화 환산이 정확해져요" />
+        <RateField
+          label="기본 환율 (100엔 = ?원)"
+          value={rate}
+          onChange={setRate}
+          needsSave
+          hint="지출은 적을 때마다 그때 환율이 따로 저장돼요. 이 값은 환율을 못 불러올 때와 환율이 저장 안 된 예전 지출에만 써요."
+        />
         <div>
           <span className="mb-1.5 block text-[13px] font-medium text-neutral-500">일행 (가계부 정산에 사용)</span>
           <div className="flex flex-wrap gap-1.5">
@@ -209,7 +215,13 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
         <p>
           <b className="text-neutral-700">안드로이드</b> 크롬 메뉴(⋮) → 홈 화면에 추가
         </p>
-        <p className="pt-2 text-xs text-neutral-400">지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim) · 환율 Frankfurter (유럽중앙은행 기준값) · 글꼴 Pretendard (SIL OFL)</p>
+        <p className="pt-2 text-xs text-neutral-400">
+          지도 地理院タイル(국토지리원) · 장소 검색 © OpenStreetMap (Nominatim) ·{' '}
+          <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+            Rates By Exchange Rate API
+          </a>{' '}
+          · 환율 Frankfurter (유럽중앙은행) · 글꼴 Pretendard (SIL OFL)
+        </p>
       </section>
 
       <Band />

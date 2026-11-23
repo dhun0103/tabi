@@ -80,6 +80,11 @@ export function toKRW(amount: number, currency: Currency, krwPer100Jpy: number):
   return currency === 'KRW' ? amount : (amount * krwPer100Jpy) / 100
 }
 
+/** 지출 하나를 원화로: 그 지출에 저장된 환율, 없으면(예전 데이터) 여행 기본 환율 */
+export function expenseKRW(e: Pick<Expense, 'amount' | 'currency' | 'krwPer100Jpy'>, tripRate: number): number {
+  return toKRW(e.amount, e.currency, e.krwPer100Jpy > 0 ? e.krwPer100Jpy : tripRate)
+}
+
 export const fmtKRW = (n: number) => `${Math.round(n).toLocaleString('ko-KR')}원`
 export const fmtJPY = (n: number) => `¥${Math.round(n).toLocaleString('ko-KR')}`
 export const fmtMoney = (n: number, c: Currency) => (c === 'JPY' ? fmtJPY(n) : fmtKRW(n))
@@ -116,14 +121,14 @@ export interface Settlement {
   transfers: { from: string; to: string; amount: number }[]
 }
 
-/** 공동 경비(shared)를 1/N 해서 누가 누구에게 얼마 보내면 되는지 계산 (원화 기준) */
-export function settle(members: string[], expenses: Expense[], krwPer100Jpy: number): Settlement {
+/** 공동 경비(shared)를 1/N 해서 누가 누구에게 얼마 보내면 되는지 계산 (원화 기준, 지출마다 그때 환율) */
+export function settle(members: string[], expenses: Expense[], tripRate: number): Settlement {
   const shared = expenses.filter((e) => e.shared)
   const names = [...new Set([...members, ...shared.map((e) => e.payer).filter(Boolean)])]
   const paid = new Map(names.map((n) => [n, 0]))
   let total = 0
   for (const e of shared) {
-    const v = toKRW(e.amount, e.currency, krwPer100Jpy)
+    const v = expenseKRW(e, tripRate)
     total += v
     paid.set(e.payer, (paid.get(e.payer) ?? 0) + v)
   }

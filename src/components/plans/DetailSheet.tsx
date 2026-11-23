@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { googleDirectionsUrl, googlePlaceUrl, hasCoords } from '../../lib/geo'
 import { googlePlaceInfo, useGoogleEnabled, type PlaceInfo } from '../../lib/google'
-import { categoryOf, fmtDay, fmtKRW, fmtMoney, mondayIndex, toKRW } from '../../lib/util'
+import { categoryOf, expenseKRW, fmtDay, fmtKRW, fmtMoney, mondayIndex } from '../../lib/util'
 import type { Expense, Plan } from '../../types'
 import { CategoryIcon } from '../icons'
 import { BLUE, MINT, Sheet, btnOutline, btnPrimary } from '../ui'
@@ -56,7 +56,7 @@ export function DetailSheet({ plan, number, color, dayLabel, expenses, rate, onA
   const dayIdx = mondayIndex(plan.date)
   const hoursLine = info?.hours[dayIdx]
   const hoursText = hoursLine?.split(/:\s(.+)/)[1] ?? hoursLine
-  const total = expenses.reduce((a, e) => a + toKRW(e.amount, e.currency, rate), 0)
+  const total = expenses.reduce((a, e) => a + expenseKRW(e, rate), 0) // 지출마다 적을 때의 환율
   const meta = [plan.kind, plan.area].filter(Boolean).join(' · ')
   const when = [dayLabel || fmtDay(plan.date), plan.time].filter(Boolean).join(' · ')
 

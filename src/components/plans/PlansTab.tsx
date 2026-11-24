@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NEUTRAL_COLOR, centerOf, dayColor, googleRouteUrl, hasCoords, type LatLng } from '../../lib/geo'
+import { ROUTE_COLOR, centerOf, googleRouteUrl, hasCoords, placeColor, type LatLng } from '../../lib/geo'
 import { byOrder, moveItem, optimizeRoute, orderForInsert, reindex, sortByTime } from '../../lib/order'
 import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
@@ -38,7 +38,6 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
   const isUndated = (p: Plan) => !p.date || !days.includes(p.date)
   const itemsOf = (key: string) => plans.filter((p) => (key === UNDATED ? isUndated(p) : p.date === key)).sort(byOrder)
-  const colorOf = (key: string) => (key === UNDATED ? NEUTRAL_COLOR : dayColor(days.indexOf(key)))
   const placeCount = (items: Plan[]) => items.filter((p) => p.type === 'place').length
   const near: LatLng[] = plans.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng }))
 
@@ -69,16 +68,16 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
   const dayList = itemsOf(view)
 
-  // 지도: 고른 날의 장소만 (날짜 색 번호 핀 + 동선)
+  // 지도: 고른 날의 장소만 (종류별 색 번호 핀 + 회색 점선 동선, NOL처럼)
   const pins: MapPin[] = []
   const routes: MapRoute[] = []
   {
-    const c = colorOf(view)
     const places = dayList.filter((p) => p.type === 'place')
     places.forEach((p, i) => {
+      const c = placeColor(p.kind)
       if (hasCoords(p)) pins.push({ id: p.id, lat: p.lat, lng: p.lng, label: String(i + 1), title: p.title, color: c.bg, ink: c.ink })
     })
-    if (view !== UNDATED) routes.push({ color: c.bg, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })
+    if (view !== UNDATED) routes.push({ color: ROUTE_COLOR, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })
   }
 
   const flash = (msg: string) => {
@@ -217,7 +216,6 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
         ) : (
           <Timeline
             items={dayList}
-            color={colorOf(view)}
             spent={spent}
             activeId={activeId}
             editing={editing}

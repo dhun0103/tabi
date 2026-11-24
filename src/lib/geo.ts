@@ -1,21 +1,21 @@
 import type { Plan } from '../types'
+import { categoryFromKind } from './util'
 
-/* ───────── 날짜별 색 (지도 핀·동선·타임라인 번호) ─────────
- * 트리플 핀 색(보라·코랄·민트)으로 시작하는 8색. 색약 구분·밝기는 dataviz 검사기로 통과한 순서
- * (이웃한 날끼리 CVD ΔE ≥ 9.3). 9일차부터는 회색.
- * ink: 핀 안 숫자 색 (밝은 민트·주황 위엔 검정, 나머지는 흰색) */
-const DAY_COLORS = [
-  { bg: '#945DF7', ink: '#ffffff' }, // purple
-  { bg: '#F26365', ink: '#ffffff' }, // coral
-  { bg: '#1FBFB2', ink: '#0b0b0b' }, // mint
-  { bg: '#E07B00', ink: '#0b0b0b' }, // orange
-  { bg: '#3592F8', ink: '#ffffff' }, // blue
-  { bg: '#D9449B', ink: '#ffffff' }, // magenta
-  { bg: '#2E9E4F', ink: '#ffffff' }, // green
-  { bg: '#7A6BD8', ink: '#ffffff' }, // indigo
-]
-export const NEUTRAL_COLOR = { bg: '#52514e', ink: '#ffffff' }
-export const dayColor = (index: number) => DAY_COLORS[index] ?? NEUTRAL_COLOR
+/* ───────── 장소 번호 색 (지도 핀·타임라인 번호) ─────────
+ * NOL·트리플처럼 날짜가 아니라 장소 종류로 칠함 (Day가 바뀌어도 호텔은 늘 민트)
+ *   음식점·카페 = 코랄 · 숙소 = 민트 · 나머지(관광·쇼핑·공항…) = 보라
+ * 숫자는 NOL처럼 모두 흰색 (지도 위치가 없는 장소도 같은 색, 지도엔 핀만 안 나옴) */
+export const PLACE_COLORS = {
+  food: { bg: '#F26365', ink: '#ffffff' }, // coral
+  lodging: { bg: '#17B5A8', ink: '#ffffff' }, // mint
+  other: { bg: '#945DF7', ink: '#ffffff' }, // purple
+}
+export function placeColor(kind: string): { bg: string; ink: string } {
+  const c = categoryFromKind(kind)
+  return c === 'food' ? PLACE_COLORS.food : c === 'lodging' ? PLACE_COLORS.lodging : PLACE_COLORS.other
+}
+/** 동선 점선: 핀 색이 장소마다 달라서 선은 중립 회색 (NOL처럼) */
+export const ROUTE_COLOR = '#9AA1AB'
 
 /* ───────── 좌표 ───────── */
 

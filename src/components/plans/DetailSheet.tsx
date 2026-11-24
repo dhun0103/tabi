@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { shrinkPhoto } from '../../lib/photo'
-import { categoryOf, expenseKRW, fmtKRW, fmtMoney, newId } from '../../lib/util'
+import { categoryOf, expenseKRW, fmtKRW, fmtMoney, kindLabel, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
 import { CategoryIcon, MemoIcon } from '../icons'
@@ -33,7 +33,7 @@ export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdat
   const [memoOpen, setMemoOpen] = useState(false)
   const [memoText, setMemoText] = useState('')
   const total = expenses.reduce((a, e) => a + expenseKRW(e, rate), 0) // 지출마다 적을 때의 환율
-  const meta = [plan.kind, plan.area].filter(Boolean).join(' · ')
+  const meta = [kindLabel(plan.kind), plan.area].filter(Boolean).join(' · ')
 
   return (
     <Sheet title={plan.title} subtitle={meta ? <p className="text-[13px] text-neutral-500">{meta}</p> : undefined} onClose={onClose}>

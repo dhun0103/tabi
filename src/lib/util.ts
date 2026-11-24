@@ -128,12 +128,28 @@ export const categoryOf = (id: Category) => CATEGORIES.find((c) => c.id === id) 
 
 /** 일정 장소의 종류(관광명소, 음식점 …)로 지출 카테고리 추측 */
 export function categoryFromKind(kind: string): Category {
-  if (/음식|식당|레스토랑|맛집|라멘|라면|스시|초밥|우동|소바|돈카츠|이자카야|카페|커피|베이커리|빵|디저트|술집|바$|펍/.test(kind)) return 'food'
-  if (/쇼핑|백화점|마트|상점|매장|편의점|시장|몰|아웃렛|기념품/.test(kind)) return 'shopping'
-  if (/호텔|숙소|료칸|게스트|호스텔|리조트|민박/.test(kind)) return 'lodging'
+  if (
+    /음식|식당|레스토랑|맛집|라멘|라면|스시|초밥|우동|소바|돈카츠|규카츠|텐동|튀김|이자카야|야키토리|꼬치|야키니쿠|고깃집|오코노미야키|타코야키|덮밥|요리|스테이크|바비큐|바베큐|버거|피자|치킨|샌드위치|분식|뷔페|푸드|카페|커피|찻집|베이커리|빵|디저트|아이스크림|술집|주점|바$|펍/.test(
+      kind,
+    )
+  )
+    return 'food'
+  if (/쇼핑|백화점|마트|상점|매장|편의점|시장|몰|아웃렛|기념품|판매점|할인점|스토어|면세점|드럭|화장품|잡화|의류|서점|전자|숍$|샵$|가게$/.test(kind)) return 'shopping'
+  if (/호텔|숙소|료칸|게스트|호스텔|리조트|민박|여관|모텔|캡슐|펜션|숙박|콘도/.test(kind)) return 'lodging'
   if (/역|공항|터미널|정류장|교통|버스|지하철|항구/.test(kind)) return 'transport'
-  if (/관광|명소|박물관|미술관|공원|성$|사원|절|신사|테마파크|동물원|수족관|전망|온천|유적/.test(kind)) return 'sights'
+  if (/관광|명소|박물관|미술관|공원|성$|성곽|사원|절|신사|테마파크|동물원|수족관|전망|온천|유적/.test(kind)) return 'sights'
   return 'etc'
+}
+
+/**
+ * 화면에 보이는 장소 종류: NOL·트리플처럼 4가지로 묶음 (음식점 · 쇼핑 · 숙소 · 관광명소)
+ * 저장은 구글 세부 종류 그대로("스시/초밥집", "화장품 판매점") 두고 지출 카테고리 추측·번호 색에도 씀
+ * 공항·역 같은 교통과 그 밖의 것은 NOL처럼 관광명소
+ */
+export function kindLabel(kind: string): string {
+  if (!kind.trim()) return ''
+  const c = categoryFromKind(kind)
+  return c === 'food' ? '음식점' : c === 'shopping' ? '쇼핑' : c === 'lodging' ? '숙소' : '관광명소'
 }
 
 export const METHODS: { id: PayMethod; label: string }[] = [

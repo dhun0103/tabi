@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
-import { distanceM, fmtDistance, googleLegUrl, hasCoords, travelHint } from '../../lib/geo'
-import { flightTitle } from '../../lib/util'
+import { distanceM, fmtDistance, googleLegUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
+import { flightTitle, kindLabel } from '../../lib/util'
 import type { Plan } from '../../types'
 import { MemoIcon, PlaneIcon } from '../icons'
 import { BLUE } from '../ui'
 
 interface Props {
   items: Plan[] // 순서대로 정렬된 하루치
-  color: { bg: string; ink: string }
   spent?: Map<string, string> // 장소별로 쓴 돈 (예: ¥3,200)
   activeId: string | null
   editing: boolean
@@ -57,7 +56,7 @@ function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: num
   )
 }
 
-export function Timeline({ items, color, spent, activeId, editing, onOpen, onFocus, onMove }: Props) {
+export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onMove }: Props) {
   const rows: ReactNode[] = []
   let n = 0
   let prevPlace: Plan | null = null
@@ -144,7 +143,7 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     n += 1
     const num = n
     const pinned = hasCoords(p)
-    const meta = [p.kind, p.area].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
+    const meta = [kindLabel(p.kind), p.area].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
     const money = spent?.get(p.id)
     const active = p.id === activeId
     // 첫 줄 위쪽 선은 앞에 메모가 있을 때만, 아래쪽 선은 뒤에 뭔가 있을 때만
@@ -159,7 +158,9 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
             className="absolute left-1/2 z-10 flex h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[12px] font-bold ring-2 ring-white"
             style={{
               top: CIRCLE_TOP,
-              ...(pinned ? { background: color.bg, color: color.ink } : { background: '#d4d4d8', color: '#52525b' }),
+              // 장소 종류별 색 (음식점 코랄 · 숙소 민트 · 나머지 보라). 지도 위치가 없어도 같은 색 (NOL처럼)
+              background: placeColor(p.kind).bg,
+              color: placeColor(p.kind).ink,
             }}
           >
             {num}

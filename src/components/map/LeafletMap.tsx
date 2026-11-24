@@ -1,7 +1,7 @@
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef } from 'react'
-import { JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
+import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
 
 /* 구글 키가 없을 때 쓰는 무료 지도: 일본 국토지리원 "연한 지도"(淡色地図). 출처 표시 필수, 일본 전용 */
 const TILE_URL = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'
@@ -48,7 +48,7 @@ export function LeafletMap(props: MapProps) {
     if (!map || !layer) return
     layer.clearLayers()
     markersRef.current.clear()
-    const { pins, routes = [], fallbackCenter, activeId } = latest.current
+    const { pins, routes = [], activeId } = latest.current
 
     for (const r of routes) {
       if (r.points.length < 2) continue
@@ -66,14 +66,22 @@ export function LeafletMap(props: MapProps) {
 
     if (latest.current.keepView && viewSet.current) return
     viewSet.current = true
+    fitAll(map)
+  }, [drawKey])
+
+  /** 하루 전체가 보이게: 핀이 여러 개면 다 보이게, 하나면 그 핀, 없으면 기본 위치 */
+  function fitAll(map: L.Map) {
+    const { pins, fallbackCenter } = latest.current
     if (pins.length === 1) map.setView([pins[0].lat, pins[0].lng], 15)
     else if (pins.length > 1)
       map.fitBounds(L.latLngBounds(pins.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [36, 36], maxZoom: 16 })
     else if (fallbackCenter) map.setView([fallbackCenter.lat, fallbackCenter.lng], 12)
     else map.setView([JAPAN.center.lat, JAPAN.center.lng], JAPAN.zoom)
-  }, [drawKey])
+  }
 
+  // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
   const { activeId } = props
+  const prevActive = useRef<string | null | undefined>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -82,7 +90,10 @@ export function LeafletMap(props: MapProps) {
       marker.setZIndexOffset(id === activeId ? 1000 : 0)
     }
     const hit = activeId ? markersRef.current.get(activeId) : undefined
-    if (hit) map.panTo([hit.pin.lat, hit.pin.lng], { animate: true })
+    // 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼)
+    if (hit) map.setView([hit.pin.lat, hit.pin.lng], Math.max(map.getZoom(), FOCUS_ZOOM), { animate: true })
+    else if (!activeId && prevActive.current) fitAll(map)
+    prevActive.current = activeId
   }, [activeId])
 
   // isolate: 지도 안쪽 z-index가 위의 헤더·탭바를 덮지 않게

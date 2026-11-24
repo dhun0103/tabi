@@ -59,9 +59,82 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   useEffect(() => {
     setActiveId(null)
     setEditing(false)
+    window.scrollTo({ top: 0 }) // 날을 바꾸면 그날 목록 처음부터 (지도는 하루 전체 보기)
   }, [view])
 
   const dayList = itemsOf(view)
+
+  /*
+   * 스크롤 따라 지도 이동 (NOL처럼)
+   *   지도 + Day 버튼은 헤더 밑에 붙어 있고, 그 바로 아래 줄(기준선)에 걸린 장소를 고름
+   *   → 목록에서 그 장소가 강조되고 지도가 그 장소로 이동
+   *   목록 맨 위로 돌아오면 고른 걸 풀어서 지도는 하루 전체 보기
+   */
+  const stickyRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const lockUntil = useRef(0) // 핀을 눌러 목록을 옮기는 동안엔 스크롤로 다른 장소를 고르지 않음
+  const placeKey = dayList
+    .filter((p) => p.type === 'place')
+    .map((p) => p.id)
+    .join(',')
+  useEffect(() => {
+    const ids = placeKey ? placeKey.split(',') : []
+    let frame = 0
+    const pick = () => {
+      frame = 0
+      if (Date.now() < lockUntil.current) return
+      if (window.scrollY < 8) {
+        setActiveId(null)
+        return
+      }
+      // 카드가 반 넘게 기준선 위로(지도·Day 버튼 밑으로) 들어가면 다음 장소로
+      const line = stickyRef.current?.getBoundingClientRect().bottom ?? 0
+      const top = ids.find((id) => {
+        const r = document.getElementById(`plan-${id}`)?.getBoundingClientRect()
+        return !!r && r.top + r.height / 2 > line
+      })
+      setActiveId(top ?? ids[ids.length - 1] ?? null)
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(pick)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      cancelAnimationFrame(frame)
+    }
+  }, [placeKey])
+
+  // 마지막 장소까지 기준선으로 올라올 수 있게 목록 끝에 빈 공간 (목록이 충분히 길면 0)
+  const [tail, setTail] = useState(0)
+  useEffect(() => {
+    const list = listRef.current
+    const sticky = stickyRef.current
+    const main = list?.closest('main')
+    if (!list || !sticky || !main) return
+    const ids = placeKey ? placeKey.split(',') : []
+    const measure = () => {
+      const last = ids.length ? document.getElementById(`plan-${ids[ids.length - 1]}`) : null
+      if (!last) {
+        setTail(0)
+        return
+      }
+      const line = sticky.getBoundingClientRect().bottom
+      const padBottom = parseFloat(getComputedStyle(main).paddingBottom) || 0 // 탭바 자리
+      const below = list.getBoundingClientRect().bottom - last.getBoundingClientRect().top + padBottom
+      // 화면 높이: 사파리 주소창이 접히고 펴질 때마다 바뀌는 innerHeight 대신 레이아웃 높이 (스크롤 중 빈 공간이 출렁이지 않게)
+      const screenH = document.documentElement.clientHeight
+      setTail(Math.max(0, Math.ceil(screenH - line - below)))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(list)
+    window.addEventListener('resize', measure)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [placeKey])
   // 편집 중에 항목이 1개 이하로 줄면(지우거나 일행이 지움) 편집을 끝냄
   // (안 그러면 [완료] 버튼이 사라지고 추가 버튼도 안 보이는 채로 갇힘)
   useEffect(() => {
@@ -125,9 +198,14 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     flash('시간 순서로 정리했어요')
   }
 
+  // 지도 핀을 누르면: 그 장소를 고르고, 목록에서 그 장소를 지도 바로 아래(기준선)로 올림
   const focusOnList = (id: string) => {
     setActiveId(id)
-    document.getElementById(`plan-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const el = document.getElementById(`plan-${id}`)
+    if (!el) return
+    const line = stickyRef.current?.getBoundingClientRect().bottom ?? 0
+    lockUntil.current = Date.now() + 1000 // 목록이 움직이는 동안 지나가는 장소로 바뀌지 않게
+    window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - line - 8), behavior: 'smooth' })
   }
   const openItem = (p: Plan) =>
     setSheet(p.type === 'memo' ? { kind: 'memo', plan: p } : p.type === 'flight' ? { kind: 'flight', plan: p } : { kind: 'detail', plan: p })
@@ -151,18 +229,19 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
   return (
     <>
-      <MapView
-        className="h-60 w-full bg-neutral-200"
-        pins={pins}
-        routes={routes}
-        activeId={activeId}
-        fallbackCenter={centerOf(near)}
-        onPinClick={focusOnList}
-      />
-
-      {/* Day 알약 버튼: 지도 아래에 있다가, 스크롤하면 헤더 밑에 붙는다 */}
-      <div className="sticky z-20 bg-[#f4f5f8]/95 backdrop-blur" style={{ top: 'calc(57px + env(safe-area-inset-top))' }}>
-        <div className="flex gap-2 overflow-x-auto px-4 py-3 [scrollbar-width:none]">
+      {/* 지도 + Day 알약 버튼: 스크롤해도 헤더 밑에 붙어 있음 (NOL처럼). 지도 높이는 폰 화면 높이에 맞춰 160~210px */}
+      <div ref={stickyRef} className="sticky z-20" style={{ top: 'calc(57px + env(safe-area-inset-top))' }}>
+        <div style={{ height: 'clamp(160px, 25vh, 210px)' }}>
+          <MapView
+            className="h-full w-full bg-neutral-200"
+            pins={pins}
+            routes={routes}
+            activeId={activeId}
+            fallbackCenter={centerOf(near)}
+            onPinClick={focusOnList}
+          />
+        </div>
+        <div className="flex gap-2 overflow-x-auto bg-[#f4f5f8]/95 px-4 py-3 backdrop-blur [scrollbar-width:none]">
           {tabs.map((t) => {
             const active = t.key === view
             const n = placeCount(itemsOf(t.key))
@@ -190,7 +269,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
         </div>
       </div>
 
-      <div className="px-4">
+      <div ref={listRef} className="px-4">
         <div className="flex items-center justify-between gap-3 pb-2 pt-1">
           <h2 className="min-w-0 truncate">
             <span className="text-[16px] font-bold">{view === UNDATED ? '가고 싶은 곳' : `Day ${days.indexOf(view) + 1}`}</span>
@@ -262,6 +341,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
           </div>
         )}
       </div>
+      {tail > 0 && <div aria-hidden="true" style={{ height: tail }} />}
 
       {toast && (
         <div

@@ -28,6 +28,8 @@ export interface MapProps {
 }
 
 export const JAPAN = { center: { lat: 36.2, lng: 138.25 }, zoom: 5 }
+/** 목록에서 장소를 고르면 적어도 이만큼은 확대 (시·구 정도가 보이는 크기) */
+export const FOCUS_ZOOM = 11
 
 /** 핀·동선이 바뀌었을 때만 다시 그리기 위한 키 */
 export const drawKeyOf = (p: MapProps) =>

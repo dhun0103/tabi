@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { GOOGLE_MAP_ID, gmaps } from '../../lib/google'
-import { JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
+import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
 
 interface MarkerEntry {
   marker: google.maps.marker.AdvancedMarkerElement
@@ -73,7 +73,7 @@ export function GoogleMap(props: MapProps) {
       for (const line of linesRef.current) line.setMap(null)
       linesRef.current = []
 
-      const { pins, routes = [], fallbackCenter, activeId } = latest.current
+      const { pins, routes = [], activeId } = latest.current
       for (const r of routes) {
         if (r.points.length < 2) continue
         linesRef.current.push(
@@ -98,30 +98,38 @@ export function GoogleMap(props: MapProps) {
 
       if (latest.current.keepView && viewSet.current) return
       viewSet.current = true
-      if (pins.length === 1) {
-        map.setCenter(pins[0])
-        map.setZoom(15)
-      } else if (pins.length > 1) {
-        const lats = pins.map((p) => p.lat)
-        const lngs = pins.map((p) => p.lng)
-        map.fitBounds({ north: Math.max(...lats), south: Math.min(...lats), east: Math.max(...lngs), west: Math.min(...lngs) }, 48)
-        event.addListenerOnce(map, 'idle', () => {
-          if ((map.getZoom() ?? 0) > 16) map.setZoom(16)
-        })
-      } else if (fallbackCenter) {
-        map.setCenter(fallbackCenter)
-        map.setZoom(12)
-      } else {
-        map.setCenter(JAPAN.center)
-        map.setZoom(JAPAN.zoom)
-      }
+      fitAll(map, event)
     })().catch(() => {})
     return () => {
       cancelled = true
     }
   }, [drawKey, ready])
 
+  /** 하루 전체가 보이게: 핀이 여러 개면 다 보이게, 하나면 그 핀, 없으면 기본 위치 */
+  function fitAll(map: google.maps.Map, event: typeof google.maps.event) {
+    const { pins, fallbackCenter } = latest.current
+    if (pins.length === 1) {
+      map.setCenter(pins[0])
+      map.setZoom(15)
+    } else if (pins.length > 1) {
+      const lats = pins.map((p) => p.lat)
+      const lngs = pins.map((p) => p.lng)
+      map.fitBounds({ north: Math.max(...lats), south: Math.min(...lats), east: Math.max(...lngs), west: Math.min(...lngs) }, 48)
+      event.addListenerOnce(map, 'idle', () => {
+        if ((map.getZoom() ?? 0) > 16) map.setZoom(16)
+      })
+    } else if (fallbackCenter) {
+      map.setCenter(fallbackCenter)
+      map.setZoom(12)
+    } else {
+      map.setCenter(JAPAN.center)
+      map.setZoom(JAPAN.zoom)
+    }
+  }
+
+  // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
   const { activeId } = props
+  const prevActive = useRef<string | null | undefined>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
@@ -130,7 +138,16 @@ export function GoogleMap(props: MapProps) {
       marker.zIndex = id === activeId ? 1000 : null
     }
     const hit = activeId ? markersRef.current.get(activeId) : undefined
-    if (hit) map.panTo(hit.pin)
+    if (hit) {
+      // 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼)
+      if ((map.getZoom() ?? 0) < FOCUS_ZOOM) map.setZoom(FOCUS_ZOOM)
+      map.panTo(hit.pin)
+    } else if (!activeId && prevActive.current) {
+      gmaps('core')
+        .then(({ event }) => mapRef.current === map && fitAll(map, event))
+        .catch(() => {})
+    }
+    prevActive.current = activeId
   }, [activeId])
 
   return <div ref={el} className={props.className} />

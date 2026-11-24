@@ -30,6 +30,7 @@ export function GoogleMap(props: MapProps) {
         center: JAPAN.center,
         zoom: JAPAN.zoom,
         mapId: GOOGLE_MAP_ID,
+        colorScheme: 'LIGHT', // 폰이 다크 모드여도 지도는 밝게 (앱 전체와 같이)
         disableDefaultUI: true,
         clickableIcons: false,
         gestureHandling: 'greedy',

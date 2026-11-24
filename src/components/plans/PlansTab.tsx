@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAppShown } from '../../hooks/useToday'
 import { ROUTE_COLOR, centerOf, googleRouteUrl, hasCoords, placeColor, type LatLng } from '../../lib/geo'
-import { byOrder, moveItem, optimizeRoute, orderForInsert, reindex, sortByTime } from '../../lib/order'
+import { byOrder, optimizeRoute, orderAfterMove, orderForInsert, reindex, sortByTime } from '../../lib/order'
 import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Plan, Trip } from '../../types'
@@ -88,6 +88,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   const stickyRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const lockUntil = useRef(0) // 핀을 눌러 목록을 옮기는 동안엔 스크롤로 다른 장소를 고르지 않음
+  const dragging = useRef(false) // 편집에서 순서를 끄는 동안에도 (지도가 이리저리 움직이지 않게)
   const placeKey = dayList
     .filter((p) => p.type === 'place')
     .map((p) => p.id)
@@ -97,7 +98,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     let frame = 0
     const pick = () => {
       frame = 0
-      if (Date.now() < lockUntil.current) return
+      if (dragging.current || Date.now() < lockUntil.current) return
       if (window.scrollY < 8) {
         setActiveId(null)
         return
@@ -196,7 +197,16 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   }
   const sameOrder = (a: Plan[], b: Plan[]) => a.every((p, i) => p.id === b[i]?.id)
 
-  const move = (index: number, delta: -1 | 1) => saveOrder(moveItem(dayList, index, delta))
+  // 편집: ≡ 손잡이로 끌어서 순서 바꾸기 → 옮긴 항목 하나만 저장 (앞뒤 항목 사이 order)
+  const reorder = (nextIds: string[], movedId: string) => {
+    const byId = new Map(dayList.map((p) => [p.id, p]))
+    orderAfterMove(nextIds.flatMap((id) => byId.get(id) ?? []), movedId).forEach((p) => patch(p.id, { order: p.order }))
+  }
+  // 끌 때 저절로 스크롤하는 경계: 위 = 지도·Day 버튼 아래, 아래 = 탭바 위
+  const listEdges = () => ({
+    top: stickyRef.current?.getBoundingClientRect().bottom ?? 0,
+    bottom: document.querySelector('nav')?.getBoundingClientRect().top ?? window.innerHeight,
+  })
   const optimize = () => {
     if (dayList.filter((p) => p.type === 'place' && hasCoords(p)).length < 3) {
       return flash('지도 위치가 있는 장소가 3곳 이상일 때 정리할 수 있어요')
@@ -337,7 +347,11 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
             editing={editing}
             onOpen={openItem}
             onFocus={(p) => setActiveId(p.id)}
-            onMove={move}
+            onReorder={reorder}
+            edges={listEdges}
+            onDragChange={(d) => {
+              dragging.current = d
+            }}
           />
         )}
 

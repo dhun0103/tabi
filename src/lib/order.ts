@@ -16,19 +16,25 @@ export function orderForInsert(dayItems: Plan[], time: string): number {
   return list[list.length - 1].order + 1
 }
 
-/** 한 칸 위/아래로 */
-export function moveItem(list: Plan[], index: number, delta: -1 | 1): Plan[] {
-  const j = index + delta
-  if (j < 0 || j >= list.length) return list
-  const next = [...list]
-  ;[next[index], next[j]] = [next[j], next[index]]
-  return next
-}
-
 /** 새 순서대로 order 를 0,1,2… 로 매기고, 바뀐 항목만 돌려준다 (저장할 것만) */
 export function reindex(list: Plan[]): Plan[] {
   const now = Date.now()
   return list.flatMap((p, i) => (p.order === i ? [] : [{ ...p, order: i, updatedAt: now }]))
+}
+
+/**
+ * 끌어서 옮긴 뒤 저장할 것: 옮긴 항목 하나만 새 자리 앞뒤 항목 order 의 가운데로
+ * (저장할 문서가 하나라 일행이 그사이 고친 다른 항목과 안 부딪히고, 화면도 한 번에 바뀜)
+ * 앞뒤 order 가 같아서 가운데 자리가 없으면 전체를 0,1,2… 로 다시 매김
+ */
+export function orderAfterMove(next: Plan[], movedId: string): Plan[] {
+  const i = next.findIndex((p) => p.id === movedId)
+  if (i < 0) return []
+  const prev = next[i - 1]
+  const after = next[i + 1]
+  const order = prev && after ? (prev.order + after.order) / 2 : prev ? prev.order + 1 : after ? after.order - 1 : next[i].order
+  if ((prev && !(prev.order < order)) || (after && !(order < after.order))) return reindex(next)
+  return order === next[i].order ? [] : [{ ...next[i], order, updatedAt: Date.now() }]
 }
 
 /*

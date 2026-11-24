@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import type { HTMLAttributes, ReactNode } from 'react'
 import { areaLabel, distanceM, fmtDistance, googleLegUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
 import { flightTitle, kindLabel } from '../../lib/util'
 import type { Plan } from '../../types'
 import { MemoIcon, PlaneIcon } from '../icons'
 import { BLUE } from '../ui'
+import { useDragSort } from './useDragSort'
 
 interface Props {
   items: Plan[] // 순서대로 정렬된 하루치
@@ -12,7 +13,11 @@ interface Props {
   editing: boolean
   onOpen: (p: Plan) => void
   onFocus: (p: Plan) => void
-  onMove: (index: number, delta: -1 | 1) => void
+  /** 편집 중 ≡ 손잡이를 끌어서(또는 손잡이에서 ↑↓ 키로) 순서를 바꿈: 새 순서(id 목록), 옮긴 항목 */
+  onReorder: (nextIds: string[], movedId: string) => void
+  /** 화면에서 목록이 보이는 위·아래 경계 (끌 때 그 근처에서 저절로 스크롤) */
+  edges: () => { top: number; bottom: number }
+  onDragChange?: (dragging: boolean) => void
 }
 
 /*
@@ -56,20 +61,22 @@ function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: num
   )
 }
 
-export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onMove }: Props) {
+export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onReorder, edges, onDragChange }: Props) {
+  const drag = useDragSort(
+    items.map((p) => p.id),
+    { onDrop: onReorder, edges, onDragChange },
+  )
+  // 방금 끌어 놓은 순서가 있으면 저장된 데이터가 돌아올 때까지 그 순서로
+  const byId = new Map(items.map((p) => [p.id, p]))
+  const list = drag.shown.flatMap((id) => byId.get(id) ?? [])
   const rows: ReactNode[] = []
   let n = 0
   let prevPlace: Plan | null = null
 
-  items.forEach((p, idx) => {
+  list.forEach((p, idx) => {
     const first = idx === 0
-    const last = idx === items.length - 1
-    const arrows = editing && (
-      <div className="flex shrink-0 flex-col justify-center gap-1 pl-2">
-        <ArrowButton label="위로" disabled={idx === 0} onClick={() => onMove(idx, -1)} d="M6 15l6-6 6 6" />
-        <ArrowButton label="아래로" disabled={last} onClick={() => onMove(idx, 1)} d="M6 9l6 6 6-6" />
-      </div>
-    )
+    const last = idx === list.length - 1
+    const handle = (label: string) => editing && <DragHandle label={label} {...drag.handleProps(idx)} />
 
     if (p.type === 'memo') {
       rows.push(
@@ -81,7 +88,7 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onM
             <button type="button" onClick={() => onOpen(p)} aria-label={`메모: ${p.title}`} className={`${CARD} whitespace-pre-wrap text-[15px] leading-[22px] text-neutral-800`}>
               {p.title}
             </button>
-            {arrows}
+            {handle(`메모 "${p.title.slice(0, 20)}" 순서 바꾸기`)}
           </div>
         </li>,
       )
@@ -111,7 +118,7 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onM
               <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{title}</span>
               {(meta || p.time) && <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">{meta || ' '}</span>}
             </button>
-            {arrows}
+            {handle(`항공편 ${title} 순서 바꾸기`)}
           </div>
         </li>,
       )
@@ -184,27 +191,31 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onM
               </span>
             )}
           </button>
-          {arrows}
+          {handle(`${num}번 ${p.title} 순서 바꾸기`)}
         </div>
       </li>,
     )
     prevPlace = p
   })
 
-  return <ol>{rows}</ol>
+  return <ol ref={drag.listRef}>{rows}</ol>
 }
 
-function ArrowButton(props: { label: string; disabled: boolean; onClick: () => void; d: string }) {
+/**
+ * 편집 중 카드 오른쪽 ≡ 손잡이: 잡고 위아래로 끌어서 순서 바꾸기 (NOL처럼)
+ * touch-none: 손잡이에서 시작한 손가락은 화면 스크롤 대신 끌기로. 초점이 있으면 ↑↓ 키로 한 칸씩
+ */
+function DragHandle({ label, ...rest }: { label: string } & Pick<HTMLAttributes<HTMLButtonElement>, 'onPointerDown' | 'onKeyDown'>) {
   return (
     <button
       type="button"
-      aria-label={props.label}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-neutral-600 shadow-sm ring-1 ring-neutral-200 active:bg-neutral-100 disabled:opacity-25"
+      aria-label={`${label} (끌거나 위아래 화살표 키)`}
+      title="끌어서 순서 바꾸기"
+      {...rest}
+      className="ml-1 flex w-10 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-lg text-neutral-400 active:cursor-grabbing active:text-neutral-600"
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-        <path d={props.d} />
+      <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+        <path d="M5 8h14M5 12h14M5 16h14" />
       </svg>
     </button>
   )

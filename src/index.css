@@ -8,8 +8,9 @@
     sans-serif;
 }
 
+/* 폰이 다크 모드여도 항상 밝은 화면 (트리플처럼). only: 크롬 등이 페이지를 알아서 어둡게 칠하는 기능도 끔 (index.html 메타와 같이) */
 :root {
-  color-scheme: light;
+  color-scheme: only light;
   -webkit-tap-highlight-color: transparent;
 }
 

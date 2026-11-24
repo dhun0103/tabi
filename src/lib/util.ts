@@ -1,4 +1,4 @@
-import type { Category, Currency, Expense, PayMethod, Plan } from '../types'
+import type { Category, Currency, Expense, Flight, PayMethod, Plan } from '../types'
 
 /* ───────── ID ───────── */
 
@@ -74,11 +74,20 @@ export function dayText(days: string[], d: string): string {
   return d ? fmtDay(d) : '날짜 미정 · 가고 싶은 곳'
 }
 
+/** 항공편 제목 (NOL 표기): "ICN 09:10 - NGO 10:55". 비어 있는 칸은 건너뜀 */
+export function flightTitle(f: Pick<Flight, 'from' | 'to' | 'arrive'>, depart: string): string {
+  const a = [f.from, depart].filter(Boolean).join(' ')
+  const b = [f.to, f.arrive].filter(Boolean).join(' ')
+  return [a, b].filter(Boolean).join(' - ')
+}
+
 /** 시간을 처음 고를 때 보여 줄 값: 그날 마지막 일정 1시간 뒤 (없으면 12:00) */
 export function suggestTime(plans: Plan[], date: string, exceptId?: string): string {
+  // 항공편은 도착 시간까지 보고 그 1시간 뒤를 권함
   const last = plans
-    .filter((p) => p.id !== exceptId && p.date === date && p.time)
-    .map((p) => p.time)
+    .filter((p) => p.id !== exceptId && p.date === date)
+    .flatMap((p) => [p.time, p.flight?.arrive ?? ''])
+    .filter(Boolean)
     .sort()
     .pop()
   if (!last) return '12:00'

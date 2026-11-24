@@ -8,6 +8,7 @@ import { ExpenseSheet } from '../expenses/ExpenseSheet'
 import { MapView, type MapPin, type MapRoute } from '../map/MapView'
 import { BLUE, Empty, btnGhost, cardCls, reportError } from '../ui'
 import { DetailSheet } from './DetailSheet'
+import { FlightSheet } from './FlightSheet'
 import { MemoSheet } from './MemoSheet'
 import { PlaceSheet } from './PlaceSheet'
 import { Timeline } from './Timeline'
@@ -18,10 +19,11 @@ type SheetState =
   | { kind: 'detail'; plan: Plan }
   | { kind: 'place'; plan: Plan | null }
   | { kind: 'memo'; plan: Plan | null }
+  | { kind: 'flight'; plan: Plan | null }
   | { kind: 'expense'; plan: Plan; expense: Expense | null }
   | null
 
-// 맨 아래 [메모 추가] [장소 추가]: 같은 너비, 흰 바탕 + 연한 테두리 (NOL처럼)
+// 맨 아래 [메모 추가] [항공편 추가] [장소 추가]: 같은 너비, 흰 바탕 + 연한 테두리 (NOL처럼)
 const addBtn = 'rounded-lg border border-neutral-200 bg-white py-3 text-[15px] font-semibold text-neutral-700 active:bg-neutral-50'
 
 export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[]; expenses: Expense[] }) {
@@ -118,7 +120,8 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     setActiveId(id)
     document.getElementById(`plan-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
-  const openItem = (p: Plan) => setSheet(p.type === 'memo' ? { kind: 'memo', plan: p } : { kind: 'detail', plan: p })
+  const openItem = (p: Plan) =>
+    setSheet(p.type === 'memo' ? { kind: 'memo', plan: p } : p.type === 'flight' ? { kind: 'flight', plan: p } : { kind: 'detail', plan: p })
 
   const tabs = [...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })), { key: UNDATED, label: '미정' }]
   // 시트에는 항상 최신 데이터 (일행이 고쳤을 수도 있으니)
@@ -226,9 +229,12 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
 
         {/* 지금 보고 있는 날(또는 미정)에 추가된다 → 장소·메모 창에서 날짜를 따로 고르지 않음 */}
         {!editing && (
-          <div className="mb-4 mt-2 grid grid-cols-2 gap-2">
+          <div className="mb-4 mt-2 grid grid-cols-3 gap-2">
             <button type="button" onClick={() => setSheet({ kind: 'memo', plan: null })} className={addBtn}>
               메모 추가
+            </button>
+            <button type="button" onClick={() => setSheet({ kind: 'flight', plan: null })} className={addBtn}>
+              항공편 추가
             </button>
             <button type="button" onClick={() => setSheet({ kind: 'place', plan: null })} className={addBtn}>
               장소 추가
@@ -279,6 +285,9 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
       )}
       {sheet?.kind === 'memo' && (
         <MemoSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={view} onClose={() => setSheet(null)} />
+      )}
+      {sheet?.kind === 'flight' && (
+        <FlightSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={view} onClose={() => setSheet(null)} />
       )}
     </>
   )

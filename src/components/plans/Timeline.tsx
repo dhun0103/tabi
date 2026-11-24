@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import { distanceM, fmtDistance, googleLegUrl, hasCoords, travelHint } from '../../lib/geo'
+import { flightTitle } from '../../lib/util'
 import type { Plan } from '../../types'
-import { MemoIcon } from '../icons'
+import { MemoIcon, PlaneIcon } from '../icons'
 import { BLUE } from '../ui'
 
 interface Props {
@@ -33,6 +34,18 @@ const TIME_GAP = TIME_TOP + META_LH - CIRCLE_TOP // 시간이 있으면 시간 �
 const CARD = 'block min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-left shadow-[0_1px_3px_rgba(16,24,40,0.08)] ring-1 ring-black/[0.03] active:bg-neutral-50'
 
 /** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 (gap: 가운데 아래로 선을 비울 길이) */
+/** 번호 원(또는 비행기) 아래 시간 — 카드 둘째 줄과 같은 높이 */
+function RailTime({ time }: { time: string }) {
+  return (
+    <span
+      className="absolute left-1/2 flex -translate-x-1/2 items-center whitespace-nowrap text-[11px] font-semibold tabular-nums leading-none text-neutral-500"
+      style={{ top: TIME_TOP, height: META_LH }}
+    >
+      {time}
+    </span>
+  )
+}
+
 function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: number; children?: ReactNode }) {
   const c = props.center ?? CIRCLE_TOP
   return (
@@ -76,6 +89,36 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
       return
     }
 
+    if (p.type === 'flight') {
+      // 항공편: 파란 원 안 비행기 + 출발 시간, 카드엔 "ICN 09:10 - NGO 10:55" / "제주항공 · 7C1201" (NOL처럼)
+      // 번호를 매기지 않고 거리 계산에서도 빠짐(좌표 없음) → 앞뒤 장소 사이 거리 알약은 그대로 나옴
+      const f = p.flight
+      const title = f ? flightTitle(f, p.time) : p.title
+      const meta = f ? [f.airline, f.number].filter(Boolean).join(' · ') : ''
+      rows.push(
+        <li key={p.id} id={`plan-${p.id}`} className="flex">
+          <Rail top={!first} bottom={!last} gap={p.time ? TIME_GAP : 0}>
+            {p.time && <RailTime time={p.time} />}
+            <span
+              className="absolute left-1/2 z-10 flex h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-white ring-2 ring-white"
+              style={{ top: CIRCLE_TOP, background: BLUE }}
+              aria-hidden="true"
+            >
+              <PlaneIcon className="h-3.5 w-3.5 rotate-45" />
+            </span>
+          </Rail>
+          <div className="flex min-w-0 flex-1 py-1.5">
+            <button type="button" onClick={() => onOpen(p)} aria-label={`항공편: ${title}${meta ? `, ${meta}` : ''}`} className={CARD}>
+              <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{title}</span>
+              {(meta || p.time) && <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">{meta || ' '}</span>}
+            </button>
+            {arrows}
+          </div>
+        </li>,
+      )
+      return
+    }
+
     // 앞 장소와의 거리 알약 (선 위). 누르면 그 구간 길찾기
     if (prevPlace && !editing && hasCoords(prevPlace) && hasCoords(p)) {
       const d = distanceM(prevPlace, p)
@@ -108,14 +151,7 @@ export function Timeline({ items, color, spent, activeId, editing, onOpen, onFoc
     rows.push(
       <li key={p.id} id={`plan-${p.id}`} className={`-mx-4 flex px-4 transition-colors ${active ? 'bg-[#ECF4FF]' : ''}`}>
         <Rail top={!first} bottom={!last} gap={p.time ? TIME_GAP : 0}>
-          {p.time && (
-            <span
-              className="absolute left-1/2 flex -translate-x-1/2 items-center whitespace-nowrap text-[11px] font-semibold tabular-nums leading-none text-neutral-500"
-              style={{ top: TIME_TOP, height: META_LH }}
-            >
-              {p.time}
-            </span>
-          )}
+          {p.time && <RailTime time={p.time} />}
           <button
             type="button"
             onClick={() => pinned && onFocus(p)}

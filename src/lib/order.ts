@@ -4,12 +4,12 @@ import { distanceM, hasCoords } from './geo'
 /** 같은 날 안의 순서: order 작은 것부터 */
 export const byOrder = (a: Plan, b: Plan) => a.order - b.order || a.createdAt - b.createdAt
 
-/** 새로 넣는(또는 날짜·시간을 바꾼) 항목의 자리: 시간이 있으면 시간 순 자리, 없으면 맨 끝 */
+/** 새로 넣는(또는 날짜·시간을 바꾼) 항목의 자리: 시간이 있으면 시간 순 자리(장소·항공편 시간 기준), 없으면 맨 끝 */
 export function orderForInsert(dayItems: Plan[], time: string): number {
   const list = [...dayItems].sort(byOrder)
   if (!list.length) return 0
   if (time) {
-    const idx = list.findIndex((p) => p.type === 'place' && p.time && p.time > time)
+    const idx = list.findIndex((p) => p.type !== 'memo' && p.time && p.time > time)
     if (idx === 0) return list[0].order - 1
     if (idx > 0) return (list[idx - 1].order + list[idx].order) / 2
   }
@@ -31,16 +31,23 @@ export function reindex(list: Plan[]): Plan[] {
   return list.flatMap((p, i) => (p.order === i ? [] : [{ ...p, order: i, updatedAt: now }]))
 }
 
-/* 메모는 바로 앞 장소에 붙어서 같이 움직인다 (장소 1개 + 뒤따르는 메모들 = 한 묶음) */
+/*
+ * 묶음 = 머리 항목 1개 + 뒤따르는 항목들 (같이 움직임)
+ *   거리순 동선 정리: 머리는 장소만 → 메모·항공편은 바로 앞 장소에 붙어서 같이 이동 (항공편은 좌표가 없어서)
+ *   시간순 정리: 머리는 장소·항공편 → 항공편도 자기 출발 시간으로 자리를 찾음, 메모만 앞 항목에 붙음
+ */
 interface Block {
   head: Plan | null
   items: Plan[]
 }
 
-function toBlocks(list: Plan[]): Block[] {
+const isPlace = (p: Plan) => p.type === 'place'
+const isTimed = (p: Plan) => p.type !== 'memo'
+
+function toBlocks(list: Plan[], isHead: (p: Plan) => boolean): Block[] {
   const blocks: Block[] = []
   for (const p of list) {
-    if (p.type === 'place' || !blocks.length) blocks.push({ head: p.type === 'place' ? p : null, items: [p] })
+    if (isHead(p) || !blocks.length) blocks.push({ head: isHead(p) ? p : null, items: [p] })
     else blocks[blocks.length - 1].items.push(p)
   }
   return blocks
@@ -52,7 +59,7 @@ function toBlocks(list: Plan[]): Block[] {
  * 좌표 없는 장소는 맨 뒤로. 장소가 3곳 미만이면 바꿀 게 없어서 그대로.
  */
 export function optimizeRoute(list: Plan[]): Plan[] {
-  const blocks = toBlocks(list)
+  const blocks = toBlocks(list, isPlace)
   const lead = blocks.length && !blocks[0].head ? [blocks.shift()!] : []
   const geo = blocks.filter((b) => b.head && hasCoords(b.head))
   const rest = blocks.filter((b) => !(b.head && hasCoords(b.head)))
@@ -95,9 +102,9 @@ export function optimizeRoute(list: Plan[]): Plan[] {
   return [...lead, ...path.map((i) => geo[i]), ...rest].flatMap((b) => b.items)
 }
 
-/** 시간순 정리: 시간 있는 장소를 시간 순으로, 시간 없는 장소는 뒤에 (원래 순서 유지) */
+/** 시간순 정리: 시간 있는 장소·항공편을 시간 순으로, 시간 없는 장소는 뒤에 (원래 순서 유지) */
 export function sortByTime(list: Plan[]): Plan[] {
-  const blocks = toBlocks(list)
+  const blocks = toBlocks(list, isTimed)
   const lead = blocks.length && !blocks[0].head ? [blocks.shift()!] : []
   const keyed = blocks.map((b, i) => ({ b, i, t: b.head?.time ?? '' }))
   keyed.sort((x, y) => {

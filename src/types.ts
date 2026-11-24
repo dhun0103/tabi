@@ -1,7 +1,16 @@
 export type Currency = 'JPY' | 'KRW'
 export type Category = 'food' | 'transport' | 'shopping' | 'lodging' | 'sights' | 'etc'
 export type PayMethod = 'cash' | 'card'
-export type PlanType = 'place' | 'memo'
+export type PlanType = 'place' | 'memo' | 'flight'
+
+/** 항공편 (일정에 비행기 아이콘으로 나옴). 출발 시간은 Plan.time */
+export interface Flight {
+  from: string // 출발 공항 (ICN)
+  to: string // 도착 공항 (NGO)
+  arrive: string // 도착 시간 HH:mm, '' = 모름
+  airline: string // 제주항공
+  number: string // 편명 7C1201
+}
 
 export interface Trip {
   id: string
@@ -16,7 +25,7 @@ export interface Trip {
 
 export interface Plan {
   id: string
-  type: PlanType // place = 장소, memo = 일정 사이 메모
+  type: PlanType // place = 장소, memo = 일정 사이 메모, flight = 항공편
   date: string // YYYY-MM-DD, '' = 날짜 미정
   time: string // HH:mm, '' = 시간 미정
   order: number // 같은 날 안의 순서 (작을수록 위)
@@ -30,6 +39,7 @@ export interface Plan {
   lng: number | null
   kind: string // 관광명소, 음식점, 카페 …
   area: string // 나카구, 나고야시
+  flight?: Flight // type이 flight일 때만 (다른 종류엔 이 칸 자체가 없음: Firestore는 undefined 값을 못 받음)
   createdAt: number
   updatedAt: number
 }

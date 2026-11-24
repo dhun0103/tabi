@@ -1,4 +1,4 @@
-import type { Expense, Plan, Trip } from '../types'
+import type { Expense, Flight, Plan, PlanType, Trip } from '../types'
 import { CATEGORIES } from './util'
 
 /**
@@ -21,6 +21,11 @@ const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite
 const coord = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 const okId = (v: unknown): v is string => typeof v === 'string' && /^[0-9A-Za-z_-]{1,64}$/.test(v)
 
+function normalizeFlight(x: unknown): Flight {
+  const f = (x ?? {}) as Obj
+  return { from: str(f.from), to: str(f.to), arrive: str(f.arrive), airline: str(f.airline), number: str(f.number) }
+}
+
 export function normalizePlan(x: unknown): Plan | null {
   const o = (x ?? {}) as Obj
   if (!okId(o.id)) return null
@@ -28,9 +33,12 @@ export function normalizePlan(x: unknown): Plan | null {
   const lat = coord(o.lat)
   const lng = coord(o.lng)
   const createdAt = num(o.createdAt, now)
+  const type: PlanType = o.type === 'memo' || o.type === 'flight' ? o.type : 'place'
   return {
     id: o.id,
-    type: o.type === 'memo' ? 'memo' : 'place',
+    type,
+    // 항공편만 flight 칸을 가짐 (다른 종류엔 칸을 아예 안 만듦: Firestore가 undefined를 못 받음)
+    ...(type === 'flight' ? { flight: normalizeFlight(o.flight) } : {}),
     date: str(o.date),
     time: str(o.time),
     order: num(o.order, createdAt), // 예전 데이터: 만든 순서대로

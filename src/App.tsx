@@ -3,6 +3,7 @@ import { ExpensesTab } from './components/ExpensesTab'
 import { Onboarding } from './components/Onboarding'
 import { PlansTab } from './components/plans/PlansTab'
 import { SettingsTab } from './components/SettingsTab'
+import { useToday } from './hooks/useToday'
 import { useOnline, useTripData } from './hooks/useTripData'
 import { forgetTrip, loadCurrent, rememberTrip, saveCurrent } from './lib/session'
 import { ddayLabel, fmtDay, parseTripId } from './lib/util'
@@ -104,7 +105,8 @@ function Center({ children }: { children: ReactNode }) {
  * 저장 상태는 평소(공유 중)엔 숨기고, 인터넷이 끊겼을 때만 D-day 왼쪽에 "오프라인" (고친 건 폰에 두었다가 연결되면 올라감)
  */
 function Header({ trip, online }: { trip: Trip; online: boolean }) {
-  const dday = ddayLabel(trip.startDate, trip.endDate)
+  const today = useToday() // 자정이 지나거나 아침에 앱을 다시 열면 "여행 N일째"도 새 날짜로
+  const dday = ddayLabel(trip.startDate, trip.endDate, today)
   const past = dday === '다녀온 여행'
   const dates = trip.endDate && trip.endDate !== trip.startDate ? `${fmtDay(trip.startDate)} – ${fmtDay(trip.endDate)}` : fmtDay(trip.startDate)
   const status = repo.mode === 'local' ? { dot: 'bg-neutral-300', text: '이 기기에만 저장' } : online ? null : { dot: 'bg-amber-500', text: '오프라인' }

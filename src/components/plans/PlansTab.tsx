@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { onAppShown } from '../../hooks/useToday'
 import { ROUTE_COLOR, centerOf, googleRouteUrl, hasCoords, placeColor, type LatLng } from '../../lib/geo'
 import { byOrder, moveItem, optimizeRoute, orderForInsert, reindex, sortByTime } from '../../lib/order'
 import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
@@ -61,6 +62,20 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     setEditing(false)
     window.scrollTo({ top: 0 }) // 날을 바꾸면 그날 목록 처음부터 (지도는 하루 전체 보기)
   }, [view])
+
+  // 날짜가 바뀐 뒤 앱으로 돌아오면(밤새 뒤에 재워 둔 앱을 아침에 다시 열면) 오늘 Day로
+  // (보고 있는 중에 자정이 지날 땐 그대로 둠: 보던 목록이 갑자기 바뀌지 않게)
+  const syncedOn = useRef(todayStr()) // 마지막으로 오늘 Day에 맞춘 날짜
+  useEffect(
+    () =>
+      onAppShown(() => {
+        const today = todayStr()
+        if (today === syncedOn.current) return
+        syncedOn.current = today
+        if (days.includes(today)) setPicked(today)
+      }),
+    [days],
+  )
 
   const dayList = itemsOf(view)
 

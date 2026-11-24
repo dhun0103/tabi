@@ -8,9 +8,9 @@ import {
   fmtJPY,
   fmtKRW,
   fmtMoney,
-  todayStr,
   tripDays,
 } from '../lib/util'
+import { useToday } from '../hooks/useToday'
 import type { Expense, Plan, Trip } from '../types'
 import { showAlert } from './ConfirmDialog'
 import { CategoryPage } from './expenses/CategoryPage'
@@ -37,7 +37,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
   const group = trip.members.length >= 2
 
   const bucketOf = (e: Expense) => (!e.date || e.date < trip.startDate ? 'pre' : e.date > trip.endDate ? 'post' : e.date)
-  const today = todayStr()
+  const today = useToday()
   const sections = [
     { key: 'pre', title: '여행 준비', sub: '항공권 · 숙소 · 환전 등', date: today < trip.startDate ? today : addDays(trip.startDate, -1) },
     ...days.map((d, i) => ({ key: d, title: `Day ${i + 1}`, sub: fmtDay(d), date: d })),

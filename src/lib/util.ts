@@ -55,8 +55,7 @@ export function daysBetween(a: string, b: string): number {
 }
 
 /** 'D-15' / '여행 2일째' / '다녀온 여행' */
-export function ddayLabel(start: string, end: string): string {
-  const today = todayStr()
+export function ddayLabel(start: string, end: string, today = todayStr()): string {
   if (!start) return ''
   if (today < start) return `D-${daysBetween(today, start)}`
   if (today <= (end || start)) return `여행 ${daysBetween(start, today) + 1}일째`

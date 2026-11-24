@@ -91,14 +91,24 @@ export function GoogleMap(props: MapProps) {
         const wrap = document.createElement('div')
         wrap.style.transform = 'translateY(50%)'
         wrap.appendChild(pinElement(p, p.id === activeId))
-        const marker = new AdvancedMarkerElement({ map, position: p, content: wrap, title: p.title, gmpClickable: true })
+        const marker = new AdvancedMarkerElement({
+          map,
+          position: p,
+          content: wrap,
+          title: p.title,
+          gmpClickable: true,
+          zIndex: p.id === activeId ? 1000 : null,
+        })
         marker.addEventListener('gmp-click', () => latest.current.onPinClick?.(p.id))
         markersRef.current.set(p.id, { marker, pin: p, wrap })
       }
 
       if (latest.current.keepView && viewSet.current) return
       viewSet.current = true
-      fitAll(map, event)
+      // 장소를 고른 채로 다시 그리면(시간을 고쳐 번호가 바뀜, 일행이 장소를 추가·삭제) 하루 전체로 튀지 않고 그 장소 그대로
+      const hit = activeId ? pins.find((p) => p.id === activeId) : undefined
+      if (hit) focusOn(map, hit)
+      else fitAll(map, event)
     })().catch(() => {})
     return () => {
       cancelled = true
@@ -127,6 +137,12 @@ export function GoogleMap(props: MapProps) {
     }
   }
 
+  /** 고른 장소로 이동. 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼) */
+  function focusOn(map: google.maps.Map, pin: MapPin) {
+    if ((map.getZoom() ?? 0) < FOCUS_ZOOM) map.setZoom(FOCUS_ZOOM)
+    map.panTo(pin)
+  }
+
   // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
   const { activeId } = props
   const prevActive = useRef<string | null | undefined>(null)
@@ -138,11 +154,8 @@ export function GoogleMap(props: MapProps) {
       marker.zIndex = id === activeId ? 1000 : null
     }
     const hit = activeId ? markersRef.current.get(activeId) : undefined
-    if (hit) {
-      // 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼)
-      if ((map.getZoom() ?? 0) < FOCUS_ZOOM) map.setZoom(FOCUS_ZOOM)
-      map.panTo(hit.pin)
-    } else if (!activeId && prevActive.current) {
+    if (hit) focusOn(map, hit.pin)
+    else if (!activeId && prevActive.current) {
       gmaps('core')
         .then(({ event }) => mapRef.current === map && fitAll(map, event))
         .catch(() => {})

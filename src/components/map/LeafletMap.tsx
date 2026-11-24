@@ -58,7 +58,12 @@ export function LeafletMap(props: MapProps) {
       ).addTo(layer)
     }
     for (const p of pins) {
-      const marker = L.marker([p.lat, p.lng], { icon: icon(p, p.id === activeId), title: p.title, riseOnHover: true })
+      const marker = L.marker([p.lat, p.lng], {
+        icon: icon(p, p.id === activeId),
+        title: p.title,
+        riseOnHover: true,
+        zIndexOffset: p.id === activeId ? 1000 : 0,
+      })
         .on('click', () => latest.current.onPinClick?.(p.id))
         .addTo(layer)
       markersRef.current.set(p.id, { marker, pin: p })
@@ -66,7 +71,10 @@ export function LeafletMap(props: MapProps) {
 
     if (latest.current.keepView && viewSet.current) return
     viewSet.current = true
-    fitAll(map)
+    // 장소를 고른 채로 다시 그리면(시간을 고쳐 번호가 바뀜, 일행이 장소를 추가·삭제) 하루 전체로 튀지 않고 그 장소 그대로
+    const hit = activeId ? pins.find((p) => p.id === activeId) : undefined
+    if (hit) focusOn(map, hit)
+    else fitAll(map)
   }, [drawKey])
 
   /** 하루 전체가 보이게: 핀이 여러 개면 다 보이게, 하나면 그 핀, 없으면 기본 위치 */
@@ -77,6 +85,11 @@ export function LeafletMap(props: MapProps) {
       map.fitBounds(L.latLngBounds(pins.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [36, 36], maxZoom: 16 })
     else if (fallbackCenter) map.setView([fallbackCenter.lat, fallbackCenter.lng], 12)
     else map.setView([JAPAN.center.lat, JAPAN.center.lng], JAPAN.zoom)
+  }
+
+  /** 고른 장소로 이동. 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼) */
+  function focusOn(map: L.Map, pin: MapPin) {
+    map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), FOCUS_ZOOM), { animate: true })
   }
 
   // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
@@ -90,8 +103,7 @@ export function LeafletMap(props: MapProps) {
       marker.setZIndexOffset(id === activeId ? 1000 : 0)
     }
     const hit = activeId ? markersRef.current.get(activeId) : undefined
-    // 하루 동선이 넓게 퍼져서 멀리 보고 있으면 동네가 보이게 조금 확대 (NOL처럼)
-    if (hit) map.setView([hit.pin.lat, hit.pin.lng], Math.max(map.getZoom(), FOCUS_ZOOM), { animate: true })
+    if (hit) focusOn(map, hit.pin)
     else if (!activeId && prevActive.current) fitAll(map)
     prevActive.current = activeId
   }, [activeId])

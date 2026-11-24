@@ -37,6 +37,41 @@ export function distanceM(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
+/* ───────── 여행 지역 이름 (NOL·트리플처럼) ─────────
+ * 구글 주소의 "나카구, 나고야시" 대신 여행자가 쓰는 지역 묶음("사카에 & 오스")으로 보여 줌
+ * NOL의 지역 DB는 받을 수 없어서 이번 여행 주변 지역만 좌표 범위(원)로 정해 둠 — 위에서부터 처음 맞는 곳
+ * 범위 밖은 시 이름만("교토시"), 좌표가 없으면 저장된 주소의 시 이름. 저장된 area 값은 그대로 둠 */
+interface TravelArea {
+  name: string
+  spots: (LatLng & { r: number })[] // r: 반지름 (m)
+}
+const TRAVEL_AREAS: TravelArea[] = [
+  // 사카에·니시키·후시미·오스·나야바시: 사카에 한가운데에서 1.5km 안 (나고야 성·나고야역은 밖)
+  { name: '사카에 & 오스', spots: [{ lat: 35.166, lng: 136.902, r: 1500 }] },
+  { name: '나고야역', spots: [{ lat: 35.1709, lng: 136.8815, r: 1000 }] },
+  {
+    name: '나고야 성 & 도쿠가와 정원',
+    spots: [
+      { lat: 35.1848, lng: 136.8997, r: 900 }, // 나고야 성
+      { lat: 35.1857, lng: 136.9337, r: 700 }, // 도쿠가와엔
+    ],
+  },
+  { name: '아쓰타', spots: [{ lat: 35.127, lng: 136.9087, r: 1200 }] },
+  { name: '다카야마', spots: [{ lat: 36.1408, lng: 137.2522, r: 6000 }] },
+  { name: '시라카와고', spots: [{ lat: 36.2578, lng: 136.9062, r: 3000 }] },
+  { name: '영종도', spots: [{ lat: 37.4602, lng: 126.4407, r: 12000 }] }, // 인천공항
+]
+
+export function areaLabel(x: { lat: number | null; lng: number | null; area: string }): string {
+  if (typeof x.lat === 'number' && typeof x.lng === 'number') {
+    const p = { lat: x.lat, lng: x.lng }
+    const hit = TRAVEL_AREAS.find((a) => a.spots.some((s) => distanceM(p, s) <= s.r))
+    if (hit) return hit.name
+  }
+  // "나카구, 나고야시" → "나고야시" (시 이름만)
+  return x.area.split(',').pop()?.trim() ?? ''
+}
+
 export function fmtDistance(m: number): string {
   if (m < 1000) return `${Math.max(10, Math.round(m / 10) * 10)}m`
   return `${(m / 1000).toFixed(m < 10000 ? 1 : 0)}km`
@@ -180,7 +215,7 @@ export async function searchPlacesFree(query: string, near: LatLng[] = [], signa
   const params = new URLSearchParams({
     format: 'jsonv2',
     q: query,
-    countrycodes: 'jp',
+    countrycodes: 'jp,kr', // 일본 + 한국 (출발 전 인천공항 등)
     'accept-language': 'ko',
     namedetails: '1',
     addressdetails: '1',

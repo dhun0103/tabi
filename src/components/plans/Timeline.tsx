@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { distanceM, fmtDistance, googleLegUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
+import { areaLabel, distanceM, fmtDistance, googleLegUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
 import { flightTitle, kindLabel } from '../../lib/util'
 import type { Plan } from '../../types'
 import { MemoIcon, PlaneIcon } from '../icons'
@@ -143,7 +143,7 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onM
     n += 1
     const num = n
     const pinned = hasCoords(p)
-    const meta = [kindLabel(p.kind), p.area].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
+    const meta = [kindLabel(p.kind), areaLabel(p)].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
     const money = spent?.get(p.id)
     const active = p.id === activeId
     // 첫 줄 위쪽 선은 앞에 메모가 있을 때만, 아래쪽 선은 뒤에 뭔가 있을 때만

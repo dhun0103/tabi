@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
+import { areaLabel, centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
 import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type GoogleSuggestion } from '../../lib/google'
 import { orderForInsert } from '../../lib/order'
 import { dayText, kindLabel, newId, suggestTime } from '../../lib/util'
@@ -217,7 +217,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-medium">{spot?.name ?? initial.title}</p>
               <p className="truncate text-xs text-neutral-500">
-                {spot ? [kindLabel(spot.kind), spot.area].filter(Boolean).join(' · ') || '지도에서 찍은 위치' : '지도 위치 없음'}
+                {spot ? [kindLabel(spot.kind), areaLabel(spot)].filter(Boolean).join(' · ') || '지도에서 찍은 위치' : '지도 위치 없음'}
               </p>
             </div>
           </div>
@@ -226,7 +226,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
             <span aria-hidden="true">📍</span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-medium">{spot.name}</p>
-              <p className="truncate text-xs text-neutral-500">{[kindLabel(spot.kind), spot.area].filter(Boolean).join(' · ') || '지도에서 찍은 위치'}</p>
+              <p className="truncate text-xs text-neutral-500">{[kindLabel(spot.kind), areaLabel(spot)].filter(Boolean).join(' · ') || '지도에서 찍은 위치'}</p>
             </div>
             <button
               type="button"
@@ -295,7 +295,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
                     <li key={r.key}>
                       <button type="button" onClick={() => choose(r)} className="w-full px-3.5 py-3 text-left active:bg-neutral-50">
                         <p className="text-[15px] font-medium">{r.name}</p>
-                        <p className="text-xs text-neutral-500">{[kindLabel(r.kind), r.area].filter(Boolean).join(' · ')}</p>
+                        <p className="text-xs text-neutral-500">{[kindLabel(r.kind), areaLabel(r)].filter(Boolean).join(' · ')}</p>
                       </button>
                     </li>
                   ))}

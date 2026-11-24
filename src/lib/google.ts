@@ -75,7 +75,8 @@ export async function googleSuggest(
     input,
     sessionToken,
     language: 'ko',
-    includedRegionCodes: ['jp'],
+    // 일본 + 한국 (인천공항·김포공항처럼 출발 전 장소도 찾을 수 있게)
+    includedRegionCodes: ['jp', 'kr'],
   }
   // 이미 넣은 장소 근처 결과를 먼저
   if (near.length) request.locationBias = boundsOf(near, 0.15)

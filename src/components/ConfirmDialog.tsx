@@ -1,5 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../lib/backstack'
 
 /*
  * 앱 안 확인 창 ("이 장소를 일정에서 뺄까요?" [취소] [삭제]) + 확인 버튼 하나짜리 알림
@@ -71,6 +72,8 @@ export function ConfirmHost() {
   const p = useSyncExternalStore(subscribe, () => pending)
   const boxRef = useRef<HTMLDivElement>(null)
   const firstRef = useRef<HTMLButtonElement>(null)
+  // 휴대폰 뒤로 가기 = 취소 (알림이면 확인)
+  useBackClose(() => settle(pending?.cancelLabel === null), !!p)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   METHODS,
   addDays,
@@ -12,6 +12,7 @@ import {
   tripDays,
 } from '../lib/util'
 import type { Expense, Plan, Trip } from '../types'
+import { showAlert } from './ConfirmDialog'
 import { CategoryPage } from './expenses/CategoryPage'
 import { PeriodSelect, type Period } from './expenses/PeriodSelect'
 import { ExpenseSheet } from './expenses/ExpenseSheet'
@@ -56,6 +57,14 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
   const jpy = sum(scoped.filter((e) => e.currency === 'JPY').map((e) => e.amount))
   const perPerson = group ? total / trip.members.length : 0 // 고른 기간의 합계를 일행 수로 나눔
   const placeOf = (e: Expense) => (e.planId ? plans.find((p) => p.id === e.planId)?.title : '')
+
+  // 고치던 지출을 일행이 지웠으면 창을 닫고 알려 줌 (그대로 두면 저장할 때 되살아남)
+  const editingGone = sheet?.kind === 'edit' && !!sheet.expense && !expenses.some((e) => e.id === sheet.expense!.id)
+  useEffect(() => {
+    if (!editingGone) return
+    setSheet(null)
+    void showAlert('일행이 이 지출을 지웠어요')
+  }, [editingGone])
 
   return (
     <>
@@ -110,12 +119,11 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
                 {items.map((e) => {
                   const c = categoryOf(e.category)
                   const place = placeOf(e)
-                  const left = [
-                    place ? `📍 ${place}` : c.label,
-                    METHODS.find((m) => m.id === e.method)?.label,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')
+                  // 윗줄: 내용 → 없으면 장소 이름 → 없으면 카테고리
+                  // 아랫줄: 윗줄에 안 나온 것 (내용이 있으면 📍장소 또는 카테고리, 장소 이름이 윗줄이면 카테고리) + 결제
+                  const head = e.title || place || c.label
+                  const tag = e.title ? (place ? `📍 ${place}` : c.label) : place ? c.label : ''
+                  const left = [tag, METHODS.find((m) => m.id === e.method)?.label].filter(Boolean).join(' · ')
                   return (
                     <li key={e.id}>
                       <button type="button" onClick={() => setSheet({ kind: 'edit', expense: e })} className="flex w-full items-center gap-3 py-3.5 text-left">
@@ -123,7 +131,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
                           <CategoryIcon category={e.category} className="h-[20px] w-[20px]" />
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[15px] font-semibold">{e.title || place || c.label}</span>
+                          <span className="block truncate text-[15px] font-semibold">{head}</span>
                           <span className="block truncate text-[12px] text-neutral-400">{left}</span>
                         </span>
                         <span className="shrink-0 text-right">

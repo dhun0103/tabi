@@ -21,6 +21,9 @@ export interface MapProps {
   fallbackCenter?: LatLng | null // 핀이 없을 때 보여줄 곳
   onPinClick?: (id: string) => void
   onMapClick?: (pos: LatLng) => void
+  // true면 처음 한 번만 화면을 맞추고, 그 뒤엔 핀이 바뀌어도 화면을 안 옮김
+  // (지도에서 직접 찍을 때: 누를 때마다 확대가 풀리고 가운데로 튀지 않게)
+  keepView?: boolean
   className?: string
 }
 

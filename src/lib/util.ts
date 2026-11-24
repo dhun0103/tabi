@@ -160,6 +160,18 @@ export const METHODS: { id: PayMethod; label: string }[] = [
 
 /* ───────── 공유 링크 ───────── */
 
+/**
+ * 수정 저장 때 실제로 바꾼 칸만 골라내기
+ * 안 바꾼 칸까지 보내면, 그사이 일행이 고친 값을 내 화면의 옛 값으로 덮어쓰게 됨
+ */
+export function changedFields<T extends object>(before: T, after: Partial<T>): Partial<T> {
+  const out: Partial<T> = {}
+  for (const k of Object.keys(after) as (keyof T)[]) {
+    if (JSON.stringify(before[k]) !== JSON.stringify(after[k])) out[k] = after[k]
+  }
+  return out
+}
+
 export function shareLink(tripId: string): string {
   return `${location.origin}/#t=${tripId}`
 }

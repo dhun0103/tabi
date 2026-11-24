@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { orderForInsert } from '../../lib/order'
-import { dayText, flightTitle, newId, suggestTime } from '../../lib/util'
+import { changedFields, dayText, flightTitle, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Flight, Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
@@ -22,7 +22,9 @@ function plusHours(time: string, h: number): string {
  * 날짜는 지금 보고 있는 날(수정은 원래 날). 출발 시간 순서에 맞는 자리로 들어감
  */
 export function FlightSheet(props: { trip: Trip; days: string[]; allPlans: Plan[]; initial: Plan | null; defaultDate: string; onClose: () => void }) {
-  const { trip, days, allPlans, initial, defaultDate, onClose } = props
+  const { trip, days, allPlans, defaultDate, onClose } = props
+  // 창을 열 때의 값으로 고정 (저장할 때 내가 바꾼 칸만 고르는 기준)
+  const [initial] = useState(props.initial)
   const date = initial?.date ?? defaultDate
   const old = initial?.flight
   const [from, setFrom] = useState(old?.from ?? '')
@@ -59,7 +61,13 @@ export function FlightSheet(props: { trip: Trip; days: string[]; allPlans: Plan[
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     }
-    repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    if (initial) {
+      // 수정: 바꾼 칸만 (일행이 지운 항공편은 되살리지 않음)
+      const changes = changedFields(initial, { title: plan.title, time: plan.time, order: plan.order, flight })
+      if (Object.keys(changes).length) repo.patchItem(trip.id, 'plans', initial.id, { ...changes, updatedAt: now }).catch(reportError)
+    } else {
+      repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    }
     onClose()
   }
 

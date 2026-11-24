@@ -15,6 +15,7 @@ export function LeafletMap(props: MapProps) {
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.LayerGroup | null>(null)
   const markersRef = useRef(new Map<string, { marker: L.Marker; pin: MapPin }>())
+  const viewSet = useRef(false) // keepView: 화면을 한 번 맞췄나
   const latest = useRef(props)
   useEffect(() => {
     latest.current = props
@@ -28,6 +29,7 @@ export function LeafletMap(props: MapProps) {
     map.on('click', (e: L.LeafletMouseEvent) => latest.current.onMapClick?.({ lat: e.latlng.lat, lng: e.latlng.lng }))
     map.setView([JAPAN.center.lat, JAPAN.center.lng], JAPAN.zoom)
     mapRef.current = map
+    viewSet.current = false // 지도를 새로 만들었으니 첫 그리기 때 다시 맞춤
     const ro = new ResizeObserver(() => map.invalidateSize())
     ro.observe(el.current!)
     return () => {
@@ -62,6 +64,8 @@ export function LeafletMap(props: MapProps) {
       markersRef.current.set(p.id, { marker, pin: p })
     }
 
+    if (latest.current.keepView && viewSet.current) return
+    viewSet.current = true
     if (pins.length === 1) map.setView([pins[0].lat, pins[0].lng], 15)
     else if (pins.length > 1)
       map.fitBounds(L.latLngBounds(pins.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [36, 36], maxZoom: 16 })

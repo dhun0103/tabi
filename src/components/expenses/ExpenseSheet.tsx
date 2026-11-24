@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { cachedJpyRate, fetchJpyRate } from '../../lib/rate'
-import { CATEGORIES, METHODS, dayText, defaultDay, fmtDay, fmtKRW, newId, toKRW, tripDays } from '../../lib/util'
+import { CATEGORIES, METHODS, changedFields, dayText, defaultDay, fmtDay, fmtKRW, newId, toKRW, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Category, Currency, Expense, PayMethod, Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
@@ -135,7 +135,14 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     }
-    repo.saveItem(trip.id, 'expenses', expense).catch(reportError)
+    if (initial) {
+      // 수정: 바꾼 칸만 (그사이 일행이 고친 다른 칸은 그대로, 일행이 지운 지출은 되살리지 않음)
+      const { title: t, amount: a, currency: c, krwPer100Jpy: k, rateDate: d, category: g, method: m } = expense
+      const changes = changedFields(initial, { title: t, amount: a, currency: c, krwPer100Jpy: k, rateDate: d, category: g, method: m })
+      if (Object.keys(changes).length) repo.patchItem(trip.id, 'expenses', initial.id, { ...changes, updatedAt: now }).catch(reportError)
+    } else {
+      repo.saveItem(trip.id, 'expenses', expense).catch(reportError)
+    }
     onClose()
   }
 

@@ -147,6 +147,10 @@ Firestore 문서 하나에 그대로 저장 (trips/{여행}/photos, 문서 한�
 - `.env.local`에 Firebase 설정이 있으면 **실시간 공유**, 없으면 **이 기기에만 저장**
 - 오프라인: 앱 화면은 서비스워커가, 데이터는 Firestore 캐시가 들고 있어서 끊겨도 보고 입력 가능 → 연결되면 자동 동기화 (끊긴 동안 헤더에 "● 오프라인")
 - 공유 방식: 로그인 없음. 공유 링크 안의 20자 랜덤 ID를 아는 사람만 접근 (`firestore.rules`)
+- 둘이 같이 고칠 때: 수정은 **바꾼 칸만** 저장 (순서 바꾸기도 순서 칸만) → 그사이 일행이 고친 메모 등을 덮어쓰지 않음
+  - 일행이 지운 항목을 고치면 되살리지 않고 "이미 지워진 항목이에요" 안내, 열어 둔 창은 닫히며 알려 줌
+- 휴대폰 뒤로 가기: 열린 창(입력 창 · 사진 보기 · 시간 고르기 · 확인 창 · 카테고리 페이지)만 하나씩 닫음 → 앱이 꺼지거나 입력이 날아가지 않음
+- 화면을 그리다 오류가 나도 하얀 화면 대신 [새로고침] [처음 화면으로]. 지도 오류는 지도 칸 안에서만 (구글 → 무료 지도로 바꿈)
 
 ## 로컬 실행
 
@@ -206,6 +210,9 @@ npm.cmd run deploy:rules  # firestore.rules 만 다시 게시
 - 이 PC는 PowerShell 실행 정책 때문에 `npm`/`npx` 대신 `npm.cmd`/`npx.cmd` 로 실행
 - 처음 한 번 `npx.cmd -y firebase-tools@latest login` 필요 (tabi 프로젝트를 만든 개인 Gmail)
 - 구글 지도 키를 만들면 웹사이트 제한에 `https://tabi-f5564.web.app/*`, `https://tabi-f5564.firebaseapp.com/*` 추가
+- 캐시 (`firebase.json`): 첫 화면(`/`) · `index.html` · `sw.js`는 매번 새로 확인(no-cache), 파일 이름에 해시가 붙은 `assets/`만 1년
+  → 배포 직후 서비스워커가 없는 브라우저(카톡 안 브라우저 등)에서도 옛 화면이 남아 하얗게 되지 않음
+  → 주소가 `/#t=…` 방식이라 다른 경로를 index.html로 돌리는 rewrite는 안 씀 (없는 파일은 404)
 
 ## 폰에 설치
 
@@ -229,7 +236,7 @@ src/
 │  │  ├─ MemoSheet.tsx        메모 추가·수정
 │  │  └─ FlightSheet.tsx      항공편 추가·수정 (출발·도착 공항과 시간, 항공사, 편명)
 │  ├─ map/
-│  │  ├─ MapView.tsx          구글 지도 ↔ 무료 지도 자동 선택
+│  │  ├─ MapView.tsx          구글 지도 ↔ 무료 지도 자동 선택 (지도 오류는 지도 칸 안에서만)
 │  │  ├─ GoogleMap.tsx        구글 지도 (AdvancedMarker 번호 핀, 점선 동선)
 │  │  ├─ LeafletMap.tsx       무료 지도 (국토지리원 타일)
 │  │  └─ mapTypes.ts          공통 props
@@ -245,13 +252,15 @@ src/
 │  ├─ TimePicker.tsx          24시간 시간 고르기 (시·분 바퀴 창)
 │  ├─ ConfirmDialog.tsx       앱 안 확인 창 ("이 장소를 일정에서 뺄까요?" [취소] [삭제]) · 오류 알림
 │  │                          (브라우저 기본 confirm·alert는 일부 내장 브라우저에서 막혀서 대신 씀)
+│  ├─ ErrorBoundary.tsx       화면 오류 때 하얀 화면 대신 [새로고침] [처음 화면으로]
 │  ├─ UpdateBanner.tsx        새 버전 알림 (탭바 바로 위, "새 버전이 나왔어요 [새로고침]")
 │  └─ ui.tsx                  공용 UI (Sheet, Chip, Field …)
 ├─ store/                     저장소: 이 기기(localStorage) ↔ Firestore 자동 선택
 ├─ hooks/useTripData.ts       여행·일정·지출 실시간 구독
 └─ lib/
    ├─ google.ts               구글 API 로딩·자동완성·장소 상세 (실패 시 자동 전환)
-   ├─ geo.ts                  장소 종류별 색, 여행 지역 이름, 거리·도보 시간, 무료 장소 검색, 구글맵 링크
+   ├─ geo.ts                  장소 종류별 색, 여행 지역 이름, 지도 기본 위치(장소가 가장 많이 모인 곳), 거리·도보 시간, 무료 장소 검색, 구글맵 링크
+   ├─ backstack.ts            휴대폰 뒤로 가기 = 맨 위 창 닫기 (방문 기록 한 칸으로)
    ├─ order.ts                순서 바꾸기, 거리순 동선 정리, 시간순 정리
    ├─ rate.ts                 최신 엔→원 환율 불러오기 (ExchangeRate-API → Frankfurter)
    ├─ photo.ts                사진 줄이기 (긴 변 1280px JPEG)

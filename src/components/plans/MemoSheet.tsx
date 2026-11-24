@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { orderForInsert } from '../../lib/order'
-import { dayText, newId } from '../../lib/util'
+import { changedFields, dayText, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
@@ -8,7 +8,9 @@ import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../u
 
 /** 일정 사이에 끼워 넣는 메모 (예: "여기서 지하철 1일권 사기") */
 export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[]; initial: Plan | null; defaultDate: string; onClose: () => void }) {
-  const { trip, days, allPlans, initial, defaultDate, onClose } = props
+  const { trip, days, allPlans, defaultDate, onClose } = props
+  // 창을 열 때의 값으로 고정 (저장할 때 내가 바꾼 칸만 고르는 기준)
+  const [initial] = useState(props.initial)
   // 날짜는 고르지 않음: 추가는 지금 보고 있는 날, 수정은 원래 날 그대로
   const date = initial?.date ?? defaultDate
   const [text, setText] = useState(initial?.title ?? '')
@@ -40,7 +42,13 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     }
-    repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    if (initial) {
+      // 수정: 바꾼 칸만 (일행이 지운 메모는 되살리지 않음)
+      const changes = changedFields(initial, { title: plan.title, order: plan.order })
+      if (Object.keys(changes).length) repo.patchItem(trip.id, 'plans', initial.id, { ...changes, updatedAt: now }).catch(reportError)
+    } else {
+      repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    }
     onClose()
   }
 

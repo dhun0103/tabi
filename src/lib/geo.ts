@@ -83,11 +83,22 @@ export function travelHint(m: number): string {
   return `${fmtDistance(m)} · 대중교통 추천`
 }
 
-/** 여러 지점의 가운데 (지도 기본 위치용) */
+/**
+ * 지도 기본 위치 (핀이 없는 날 · 지도에서 직접 찍기): 장소가 가장 많이 모인 곳의 가운데
+ * 그냥 전체의 가운데를 잡으면 인천공항 + 나고야처럼 멀리 떨어진 곳이 섞일 때 동해 한가운데가 됨
+ * → 50km 안에 다른 장소가 가장 많은 묶음을 골라 그 평균 위치
+ */
 export function centerOf(points: LatLng[]): LatLng | null {
   if (!points.length) return null
-  const b = boundsOf(points, 0)
-  return { lat: (b.north + b.south) / 2, lng: (b.east + b.west) / 2 }
+  let best: LatLng[] = []
+  for (const p of points) {
+    const group = points.filter((q) => distanceM(p, q) <= 50_000)
+    if (group.length > best.length) best = group
+  }
+  return {
+    lat: best.reduce((a, p) => a + p.lat, 0) / best.length,
+    lng: best.reduce((a, p) => a + p.lng, 0) / best.length,
+  }
 }
 
 export function boundsOf(points: LatLng[], pad: number) {

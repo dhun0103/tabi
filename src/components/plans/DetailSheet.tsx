@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../../lib/backstack'
 import { areaLabel } from '../../lib/geo'
 import { shrinkPhoto } from '../../lib/photo'
 import { categoryOf, expenseKRW, fmtKRW, fmtMoney, kindLabel, newId } from '../../lib/util'
@@ -222,6 +223,7 @@ function PhotoViewer({ photo, onDelete, onClose }: { photo: Photo; onDelete: () 
   useEffect(() => {
     closeRef.current = onClose
   })
+  useBackClose(onClose) // 휴대폰 뒤로 가기도 사진 보기만 닫기
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return

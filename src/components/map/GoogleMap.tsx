@@ -14,6 +14,7 @@ export function GoogleMap(props: MapProps) {
   const mapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef(new Map<string, MarkerEntry>())
   const linesRef = useRef<google.maps.Polyline[]>([])
+  const viewSet = useRef(false) // keepView: 화면을 한 번 맞췄나
   const [ready, setReady] = useState(false)
   const latest = useRef(props)
   useEffect(() => {
@@ -38,15 +39,22 @@ export function GoogleMap(props: MapProps) {
         if (e.latLng) latest.current.onMapClick?.({ lat: e.latLng.lat(), lng: e.latLng.lng() })
       })
       mapRef.current = map
+      viewSet.current = false // 지도를 새로 만들었으니 첫 그리기 때 다시 맞춤
       setReady(true)
     })().catch(() => {
       /* gmaps() 가 실패를 알리면 MapView 가 무료 지도로 바꾼다 */
     })
     return () => {
       cancelled = true
-      for (const { marker } of markersRef.current.values()) marker.map = null
+      // 키 오류(gm_authFailure)로 구글이 멈춘 뒤엔 핀을 떼다가 구글 쪽에서 오류가 남
+      // → 무시 (안 그러면 오류가 화면 전체로 번져 앱이 하얗게 됨)
+      try {
+        for (const { marker } of markersRef.current.values()) marker.map = null
+        for (const line of linesRef.current) line.setMap(null)
+      } catch {
+        /* 무료 지도로 바뀌는 중이라 정리 실패는 상관없음 */
+      }
       markersRef.current.clear()
-      for (const line of linesRef.current) line.setMap(null)
       linesRef.current = []
       mapRef.current = null
     }
@@ -88,6 +96,8 @@ export function GoogleMap(props: MapProps) {
         markersRef.current.set(p.id, { marker, pin: p, wrap })
       }
 
+      if (latest.current.keepView && viewSet.current) return
+      viewSet.current = true
       if (pins.length === 1) {
         map.setCenter(pins[0])
         map.setZoom(15)

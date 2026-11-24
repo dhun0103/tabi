@@ -4,6 +4,7 @@ import { byOrder, moveItem, optimizeRoute, orderForInsert, reindex, sortByTime }
 import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Plan, Trip } from '../../types'
+import { showAlert } from '../ConfirmDialog'
 import { ExpenseSheet } from '../expenses/ExpenseSheet'
 import { MapView, type MapPin, type MapRoute } from '../map/MapView'
 import { BLUE, Empty, btnGhost, cardCls, reportError } from '../ui'
@@ -60,13 +61,18 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     setEditing(false)
   }, [view])
 
+  const dayList = itemsOf(view)
+  // 편집 중에 항목이 1개 이하로 줄면(지우거나 일행이 지움) 편집을 끝냄
+  // (안 그러면 [완료] 버튼이 사라지고 추가 버튼도 안 보이는 채로 갇힘)
+  useEffect(() => {
+    if (dayList.length < 2) setEditing(false)
+  }, [dayList.length])
+
   // Day 버튼: 고른 버튼이 보이게 가로 스크롤
   const tabRefs = useRef(new Map<string, HTMLButtonElement>())
   useEffect(() => {
     tabRefs.current.get(view)?.scrollIntoView({ block: 'nearest', inline: 'center' })
   }, [view])
-
-  const dayList = itemsOf(view)
 
   // 지도: 고른 날의 장소만 (종류별 색 번호 핀 + 회색 점선 동선, NOL처럼)
   const pins: MapPin[] = []
@@ -84,34 +90,38 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
     setToast(msg)
     window.setTimeout(() => setToast(''), 2200)
   }
-  const save = (p: Plan) => repo.saveItem(trip.id, 'plans', p).catch(reportError)
+  // 이미 있는 일정은 바꾼 칸만 저장: 그사이 일행이 고친 다른 칸(메모 등)을 덮어쓰지 않고, 일행이 지운 건 되살리지 않음
+  const patch = (id: string, changes: Partial<Plan>) =>
+    repo.patchItem(trip.id, 'plans', id, { ...changes, updatedAt: Date.now() }).catch(reportError)
+  const saveOrder = (list: Plan[]) => reindex(list).forEach((p) => patch(p.id, { order: p.order }))
   // 장소 카드에서 시간·메모만 바로 고칠 때 (시간을 바꾸면 그 시간 자리로 순서도 옮김: 장소 수정 창과 같은 규칙)
   const updatePlan = (p: Plan, changes: Pick<Partial<Plan>, 'time' | 'memo'>) => {
-    const next: Plan = { ...p, ...changes, updatedAt: Date.now() }
-    if (changes.time !== undefined && changes.time !== '' && changes.time !== p.time) {
-      next.order = orderForInsert(
-        plans.filter((x) => x.id !== p.id && x.date === p.date),
-        changes.time,
-      )
-    }
-    save(next)
+    const t = changes.time
+    const order =
+      t !== undefined && t !== '' && t !== p.time
+        ? orderForInsert(
+            plans.filter((x) => x.id !== p.id && x.date === p.date),
+            t,
+          )
+        : undefined
+    patch(p.id, order === undefined ? changes : { ...changes, order })
   }
   const sameOrder = (a: Plan[], b: Plan[]) => a.every((p, i) => p.id === b[i]?.id)
 
-  const move = (index: number, delta: -1 | 1) => reindex(moveItem(dayList, index, delta)).forEach(save)
+  const move = (index: number, delta: -1 | 1) => saveOrder(moveItem(dayList, index, delta))
   const optimize = () => {
     if (dayList.filter((p) => p.type === 'place' && hasCoords(p)).length < 3) {
       return flash('지도 위치가 있는 장소가 3곳 이상일 때 정리할 수 있어요')
     }
     const next = optimizeRoute(dayList)
     if (sameOrder(next, dayList)) return flash('이미 가장 짧은 동선이에요')
-    reindex(next).forEach(save)
+    saveOrder(next)
     flash('가까운 순서로 동선을 정리했어요 (시간은 그대로예요)')
   }
   const timeSort = () => {
     const next = sortByTime(dayList)
     if (sameOrder(next, dayList)) return flash('이미 시간 순서예요')
-    reindex(next).forEach(save)
+    saveOrder(next)
     flash('시간 순서로 정리했어요')
   }
 
@@ -125,6 +135,18 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   const tabs = [...days.map((d, i) => ({ key: d, label: `Day ${i + 1}` })), { key: UNDATED, label: '미정' }]
   // 시트에는 항상 최신 데이터 (일행이 고쳤을 수도 있으니)
   const sheetPlan = sheet?.plan ? (plans.find((p) => p.id === sheet.plan!.id) ?? sheet.plan) : null
+  // 열어 둔 창의 항목을 일행이 지웠으면 창을 닫고 알려 줌 (그대로 두면 고칠 때 지운 게 되살아남)
+  const gone =
+    sheet?.kind === 'expense' && sheet.expense && !expenses.some((e) => e.id === sheet.expense!.id)
+      ? '지출'
+      : sheet?.plan && !plans.some((p) => p.id === sheet.plan!.id)
+        ? '항목'
+        : ''
+  useEffect(() => {
+    if (!gone) return
+    setSheet(null)
+    void showAlert(`일행이 이 ${gone}을 지웠어요`)
+  }, [gone])
   const routeUrl = view !== UNDATED ? googleRouteUrl(dayList) : null
 
   return (

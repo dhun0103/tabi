@@ -122,6 +122,14 @@ export function createLocalRepo(): TripRepo {
       write(tripId, { ...doc, [name]: { ...doc[name], [item.id]: item } })
     },
 
+    async patchItem(tripId, name, id, changes) {
+      const doc = mustRead(tripId)
+      const cur = doc[name][id]
+      // Firestore updateDoc 과 같게: 없는 항목은 되살리지 않고 not-found
+      if (!cur) throw Object.assign(new Error('이미 지워진 항목이에요'), { code: 'not-found' })
+      write(tripId, { ...doc, [name]: { ...doc[name], [id]: { ...cur, ...changes } } })
+    },
+
     async deleteItem(tripId, name, id) {
       const doc = mustRead(tripId)
       const next = { ...doc[name] }

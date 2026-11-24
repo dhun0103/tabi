@@ -22,6 +22,12 @@ export interface TripRepo {
     onError: (err: Error) => void,
   ): Unsubscribe
   saveItem<N extends ListName>(tripId: string, name: N, item: ListItem<N>): Promise<void>
+  /**
+   * 이미 있는 항목의 몇 칸만 고침 (수정 저장·순서 바꾸기)
+   * - 안 고친 칸은 건드리지 않아서, 그사이 일행이 고친 값이 그대로 남음
+   * - 일행이 먼저 지운 항목이면 실패(code 'not-found') → 지운 항목을 되살리지 않음
+   */
+  patchItem<N extends ListName>(tripId: string, name: N, id: string, changes: Partial<ListItem<N>>): Promise<void>
   deleteItem(tripId: string, name: ListName, id: string): Promise<void>
 
   /** 장소 하나의 사진만 (사진은 커서 여행 전체를 한꺼번에 받지 않음) */

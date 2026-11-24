@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../lib/backstack'
 import { BLUE, btnOutline, btnPrimary, inputCls } from './ui'
 
 const ITEM = 40 // 한 칸 높이(px)
@@ -65,6 +66,7 @@ export function TimeDialog(props: { start: string; hasValue: boolean; onDone: (v
   useEffect(() => {
     closeRef.current = onClose
   })
+  useBackClose(onClose) // 휴대폰 뒤로 가기도 이 창만 닫기
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { areaLabel, centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
 import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type GoogleSuggestion } from '../../lib/google'
 import { orderForInsert } from '../../lib/order'
-import { dayText, kindLabel, newId, suggestTime } from '../../lib/util'
+import { changedFields, dayText, kindLabel, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
@@ -32,7 +32,10 @@ interface Props {
  *   추가: 장소 검색(구글이면 입력하는 동안 자동완성) → 고르기, 못 찾으면 지도에서 직접 찍기
  *   수정: 이름·시간·메모만. 장소와 날짜는 그대로 (바꾸려면 삭제하고 그 날에서 새로 추가)
  */
-export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose }: Props) {
+export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultDate, onClose }: Props) {
+  // 창을 열 때의 값으로 고정: 저장할 때 "내가 바꾼 칸"을 이 값과 비교해서 고른다
+  // (그사이 일행이 고친 값과 비교하면, 내가 안 건드린 칸까지 옛 값으로 덮어쓰게 됨)
+  const [initial] = useState(openedWith)
   const google = useGoogleEnabled()
   const near: LatLng[] = allPlans.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng }))
   // 날짜는 고르지 않음: 추가는 지금 보고 있는 날, 수정은 원래 날 그대로
@@ -63,6 +66,9 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
   const [error, setError] = useState('')
   const tokenRef = useRef<google.maps.places.AutocompleteSessionToken | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // 검색에서 고를 때 자동으로 넣은 이름. 이름 칸이 아직 이 값이면 [변경] 후 다른 곳을 고를 때 새 이름으로 바꿈
+  // (직접 고쳐 적은 이름은 그대로 둠)
+  const autoName = useRef('')
   useEffect(() => () => abortRef.current?.abort(), [])
 
   // 구글: 입력이 멈추면(0.25초) 자동완성 후보를 가져온다
@@ -121,11 +127,15 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
     setSuggestions(null)
     setQuery('')
     setPicking(false)
-    if (!title.trim() || title === spot?.name) setTitle(r.name)
+    if (!title.trim() || title === autoName.current) {
+      setTitle(r.name)
+      autoName.current = r.name
+    }
     setError('')
   }
 
   const chooseGoogle = async (s: GoogleSuggestion) => {
+    if (busy) return // 두 번 눌러도 장소 정보는 한 번만 가져옴
     setBusy(true)
     try {
       choose(await googleResolve(s))
@@ -179,7 +189,13 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
       updatedAt: now,
     }
     // 오프라인이면 서버 응답을 기다리지 않고 닫는다 (화면엔 바로 반영, 연결되면 동기화)
-    repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    if (initial) {
+      // 수정: 바꾼 칸만 (그사이 일행이 고친 다른 칸은 그대로, 일행이 지운 장소는 되살리지 않음)
+      const changes = changedFields(initial, { title: plan.title, time: plan.time, memo: plan.memo, order: plan.order })
+      if (Object.keys(changes).length) repo.patchItem(trip.id, 'plans', initial.id, { ...changes, updatedAt: now }).catch(reportError)
+    } else {
+      repo.saveItem(trip.id, 'plans', plan).catch(reportError)
+    }
     onClose()
   }
 
@@ -205,8 +221,9 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
               삭제
             </button>
           )}
-          <button type="button" onClick={save} className={btnPrimary}>
-            저장
+          {/* 고른 장소의 위치를 가져오는 중엔 저장 막음 (안 그러면 지도 위치 없이 저장됨) */}
+          <button type="button" onClick={save} disabled={busy} className={btnPrimary}>
+            {busy ? '불러오는 중…' : '저장'}
           </button>
         </div>
       }
@@ -276,7 +293,12 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
                   <ul className="mt-2 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
                     {suggestions.map((s) => (
                       <li key={s.placeId}>
-                        <button type="button" onClick={() => void chooseGoogle(s)} className="w-full px-3.5 py-3 text-left active:bg-neutral-50">
+                        <button
+                          type="button"
+                          onClick={() => void chooseGoogle(s)}
+                          disabled={busy}
+                          className="w-full px-3.5 py-3 text-left active:bg-neutral-50 disabled:opacity-50"
+                        >
                           <p className="text-[15px] font-medium">{s.main}</p>
                           {s.secondary && <p className="truncate text-xs text-neutral-500">{s.secondary}</p>}
                         </button>
@@ -324,6 +346,7 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
               pins={spot ? [{ id: 'spot', lat: spot.lat, lng: spot.lng, label: '', title: spot.name, color: '#2F87F2', ink: '#ffffff' }] : []}
               fallbackCenter={spot ?? centerOf(near)}
               onMapClick={pickOnMap}
+              keepView
             />
             <p className="mt-1.5 text-xs text-neutral-400">지도를 누르면 그 자리에 핀이 꽂혀요</p>
           </>

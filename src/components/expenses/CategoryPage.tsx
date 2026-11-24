@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useBackClose } from '../../lib/backstack'
 import { CATEGORIES, expenseKRW, fmtKRW } from '../../lib/util'
 import type { Category, Expense, Trip } from '../../types'
 import { CategoryIcon } from '../icons'
@@ -51,18 +52,15 @@ export function CategoryPage({ trip, expenses, periods, period, onPeriod, onClos
     closeRef.current = onClose
   })
 
-  // 열 때 방문 기록을 하나 쌓아서, 휴대폰 뒤로 가기를 누르면 앱이 아니라 이 페이지만 닫히게
-  const back = () => (history.state?.tabiPage ? history.back() : closeRef.current())
+  // 휴대폰 뒤로 가기를 누르면 앱이 아니라 이 페이지만 닫히게 (다른 창들과 같은 방식)
+  useBackClose(onClose)
+  const back = () => closeRef.current()
   useEffect(() => {
-    if (!history.state?.tabiPage) history.pushState({ tabiPage: 'categories' }, '')
-    const onPop = () => closeRef.current()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && back()
-    window.addEventListener('popstate', onPop)
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeRef.current()
     window.addEventListener('keydown', onKey)
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
-      window.removeEventListener('popstate', onPop)
       window.removeEventListener('keydown', onKey)
       document.body.style.overflow = prev
     }

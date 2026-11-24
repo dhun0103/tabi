@@ -12,6 +12,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  type DocumentData,
   type Firestore,
 } from 'firebase/firestore'
 import type { ListItem, ListName, Photo, Trip } from '../types'
@@ -77,6 +78,11 @@ export function createCloudRepo(config: FirebaseOptions): TripRepo {
 
     saveItem(tripId, name, item) {
       return setDoc(doc(db, 'trips', tripId, name, item.id), item)
+    },
+
+    // updateDoc: 준 칸만 바꾸고, 문서가 없으면(일행이 지움) not-found로 실패 → 되살리지 않음
+    patchItem(tripId, name, id, changes) {
+      return updateDoc(doc(db, 'trips', tripId, name, id), changes as DocumentData)
     },
 
     deleteItem(tripId, name, id) {

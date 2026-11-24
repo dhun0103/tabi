@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { useBackClose } from '../lib/backstack'
 import { showAlert } from './ConfirmDialog'
 
 /*
@@ -40,6 +41,7 @@ export function Sheet(props: { title: string; onClose: () => void; children: Rea
   useEffect(() => {
     closeRef.current = onClose
   })
+  useBackClose(onClose) // 휴대폰 뒤로 가기 = 이 창 닫기 (앱이 꺼지지 않게)
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -136,6 +138,11 @@ export function Empty(props: { icon: string; title: string; desc?: string }) {
 }
 
 export function reportError(e: unknown) {
+  // 일행이 먼저 지운 항목을 고치려 한 경우 (되살리지 않고 알려 줌)
+  if ((e as { code?: unknown } | null)?.code === 'not-found') {
+    void showAlert('이미 지워진 항목이에요', '일행이 먼저 지운 것 같아요. 고친 내용은 저장하지 않았어요.')
+    return
+  }
   const msg = e instanceof Error ? e.message : String(e)
   const hint = /permission/i.test(msg) ? '\n\nFirebase 콘솔에서 Firestore 규칙을 게시했는지 확인해 주세요.' : ''
   void showAlert('저장하지 못했어요', `${msg}${hint}`)

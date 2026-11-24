@@ -3,6 +3,7 @@ import { orderForInsert } from '../../lib/order'
 import { dayText, flightTitle, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Flight, Plan, Trip } from '../../types'
+import { askConfirm } from '../ConfirmDialog'
 import { TimePicker } from '../TimePicker'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
@@ -62,8 +63,8 @@ export function FlightSheet(props: { trip: Trip; days: string[]; allPlans: Plan[
     onClose()
   }
 
-  const remove = () => {
-    if (!initial || !confirm('이 항공편을 지울까요?')) return
+  const remove = async () => {
+    if (!initial || !(await askConfirm({ title: '이 항공편을 지울까요?', confirmLabel: '삭제', danger: true }))) return
     repo.deleteItem(trip.id, 'plans', initial.id).catch(reportError)
     onClose()
   }

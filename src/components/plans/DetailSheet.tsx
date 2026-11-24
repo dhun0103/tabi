@@ -5,6 +5,7 @@ import { shrinkPhoto } from '../../lib/photo'
 import { categoryOf, expenseKRW, fmtKRW, fmtMoney, kindLabel, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
+import { askConfirm } from '../ConfirmDialog'
 import { CategoryIcon, MemoIcon } from '../icons'
 import { TimeDialog } from '../TimePicker'
 import { MINT_INK, MINT_SOFT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
@@ -203,8 +204,8 @@ function PlacePhotos({ tripId, planId }: { tripId: string; planId: string }) {
       {viewing && (
         <PhotoViewer
           photo={viewing}
-          onDelete={() => {
-            if (!confirm('이 사진을 지울까요?')) return
+          onDelete={async () => {
+            if (!(await askConfirm({ title: '이 사진을 지울까요?', confirmLabel: '삭제', danger: true }))) return
             repo.deletePhoto(tripId, viewing.id).catch(reportError)
             setViewing(null)
           }}

@@ -3,6 +3,7 @@ import { orderForInsert } from '../../lib/order'
 import { dayText, newId } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
+import { askConfirm } from '../ConfirmDialog'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
 /** 일정 사이에 끼워 넣는 메모 (예: "여기서 지하철 1일권 사기") */
@@ -43,8 +44,8 @@ export function MemoSheet(props: { trip: Trip; days: string[]; allPlans: Plan[];
     onClose()
   }
 
-  const remove = () => {
-    if (!initial || !confirm('이 메모를 지울까요?')) return
+  const remove = async () => {
+    if (!initial || !(await askConfirm({ title: '이 메모를 지울까요?', confirmLabel: '삭제', danger: true }))) return
     repo.deleteItem(trip.id, 'plans', initial.id).catch(reportError)
     onClose()
   }

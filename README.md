@@ -243,6 +243,8 @@ src/
 │  ├─ RateField.tsx           환율 칸 + [오늘 환율] 버튼 (설정·지출 공용)
 │  ├─ MembersField.tsx        일행 칸: 이름 칩 + [추가] (새 여행·설정 공용)
 │  ├─ TimePicker.tsx          24시간 시간 고르기 (시·분 바퀴 창)
+│  ├─ ConfirmDialog.tsx       앱 안 확인 창 ("이 장소를 일정에서 뺄까요?" [취소] [삭제]) · 오류 알림
+│  │                          (브라우저 기본 confirm·alert는 일부 내장 브라우저에서 막혀서 대신 씀)
 │  ├─ UpdateBanner.tsx        새 버전 알림 (탭바 바로 위, "새 버전이 나왔어요 [새로고침]")
 │  └─ ui.tsx                  공용 UI (Sheet, Chip, Field …)
 ├─ store/                     저장소: 이 기기(localStorage) ↔ Firestore 자동 선택

@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { showAlert } from './ConfirmDialog'
 
 /*
  * 트리플 톤: 흰 카드 + 파란 버튼(선택된 Day·주요 버튼), 회색 알약 칩, 민트 아이콘
@@ -137,5 +138,5 @@ export function Empty(props: { icon: string; title: string; desc?: string }) {
 export function reportError(e: unknown) {
   const msg = e instanceof Error ? e.message : String(e)
   const hint = /permission/i.test(msg) ? '\n\nFirebase 콘솔에서 Firestore 규칙을 게시했는지 확인해 주세요.' : ''
-  alert(`저장하지 못했어요: ${msg}${hint}`)
+  void showAlert('저장하지 못했어요', `${msg}${hint}`)
 }

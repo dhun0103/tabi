@@ -5,6 +5,7 @@ import { orderForInsert } from '../../lib/order'
 import { dayText, kindLabel, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
+import { askConfirm } from '../ConfirmDialog'
 import { MapView } from '../map/MapView'
 import { TimePicker } from '../TimePicker'
 import { Field, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
@@ -182,8 +183,10 @@ export function PlaceSheet({ trip, days, allPlans, initial, defaultDate, onClose
     onClose()
   }
 
-  const remove = () => {
-    if (!initial || !confirm('이 장소를 일정에서 뺄까요? (이 장소 사진도 같이 지워져요)')) return
+  const remove = async () => {
+    if (!initial) return
+    const ok = await askConfirm({ title: '이 장소를 일정에서 뺄까요?', message: '이 장소 사진도 같이 지워져요', confirmLabel: '삭제', danger: true })
+    if (!ok) return
     repo.deleteItem(trip.id, 'plans', initial.id).catch(reportError)
     repo.deletePhotosOf(trip.id, initial.id).catch(() => {}) // 사진은 못 지워도 일정 삭제는 그대로
     onClose()

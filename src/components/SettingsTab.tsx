@@ -3,6 +3,7 @@ import { parseBackup, type Backup } from '../lib/backup'
 import { shareLink, todayStr } from '../lib/util'
 import { repo } from '../store'
 import type { Expense, Plan, Trip } from '../types'
+import { askConfirm, showAlert } from './ConfirmDialog'
 import { MembersField, addName } from './MembersField'
 import { RateField } from './RateField'
 import { Band, Field, btnPrimary, inputCls, reportError, sectionTitle } from './ui'
@@ -82,7 +83,12 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
   const importBackup = async (file: File) => {
     try {
       const { plans: ps, expenses: es } = parseBackup(await file.text())
-      if (!confirm(`일정 ${ps.length}개, 지출 ${es.length}개를 이 여행에 합칠까요?\n(같은 항목은 백업 내용으로 덮어써요)`)) return
+      const ok = await askConfirm({
+        title: `일정 ${ps.length}개, 지출 ${es.length}개를 이 여행에 합칠까요?`,
+        message: '같은 항목은 백업 내용으로 덮어써요',
+        confirmLabel: '합치기',
+      })
+      if (!ok) return
       let alerted = false
       const onErr = (e: unknown) => {
         if (!alerted) {
@@ -94,7 +100,7 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       es.forEach((e) => repo.saveItem(trip.id, 'expenses', e).catch(onErr))
       setMsg(`가져왔어요: 일정 ${ps.length}개, 지출 ${es.length}개`)
     } catch (e) {
-      alert(`가져오지 못했어요: ${e instanceof Error ? e.message : String(e)}`)
+      void showAlert('가져오지 못했어요', e instanceof Error ? e.message : String(e))
     }
   }
 

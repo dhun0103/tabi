@@ -3,6 +3,7 @@ import { cachedJpyRate, fetchJpyRate } from '../../lib/rate'
 import { CATEGORIES, METHODS, dayText, defaultDay, fmtDay, fmtKRW, newId, toKRW, tripDays } from '../../lib/util'
 import { repo } from '../../store'
 import type { Category, Currency, Expense, PayMethod, Plan, Trip } from '../../types'
+import { askConfirm } from '../ConfirmDialog'
 import { RateField } from '../RateField'
 import { Chip, Field, Group, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
@@ -138,8 +139,8 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
     onClose()
   }
 
-  const remove = () => {
-    if (!initial || !confirm('이 지출을 삭제할까요?')) return
+  const remove = async () => {
+    if (!initial || !(await askConfirm({ title: '이 지출을 삭제할까요?', confirmLabel: '삭제', danger: true }))) return
     repo.deleteItem(trip.id, 'expenses', initial.id).catch(reportError)
     onClose()
   }

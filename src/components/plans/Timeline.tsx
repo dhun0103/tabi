@@ -85,7 +85,7 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onR
             <span className="absolute left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ top: CIRCLE_TOP, background: BLUE }} />
           </Rail>
           <div className="flex min-w-0 flex-1 py-1.5">
-            <button type="button" onClick={() => onOpen(p)} aria-label={`메모: ${p.title}`} className={`${CARD} whitespace-pre-wrap text-[15px] leading-[22px] text-neutral-800`}>
+            <button type="button" onClick={() => onOpen(p)} aria-label={`메모: ${p.title}`} className={`${CARD} whitespace-pre-wrap wrap-anywhere text-[15px] leading-[22px] text-neutral-800`}>
               {p.title}
             </button>
             {handle(`메모 "${p.title.slice(0, 20)}" 순서 바꾸기`)}
@@ -185,9 +185,10 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onR
             </span>
             {p.memo && (
               // 장소 메모: ≡ 아이콘으로 메모인 걸 표시 (NOL처럼), 종류·동네보다 진하게
+              // 길어도 줄이지 않고 끝까지 (카드를 누르지 않고 목록에서 바로 읽게). 긴 주소·링크는 카드 안에서 줄바꿈
               <span className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-5 text-neutral-700">
                 <MemoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
-                <span className="line-clamp-2 min-w-0 whitespace-pre-wrap">{p.memo}</span>
+                <span className="min-w-0 whitespace-pre-wrap wrap-anywhere">{p.memo}</span>
               </span>
             )}
           </button>

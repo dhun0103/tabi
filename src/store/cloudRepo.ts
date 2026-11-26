@@ -15,7 +15,8 @@ import {
   type DocumentData,
   type Firestore,
 } from 'firebase/firestore'
-import type { ListItem, ListName, Photo, Trip } from '../types'
+import { myKey } from '../lib/session'
+import type { Expense, ListItem, ListName, Photo, Trip } from '../types'
 import type { TripRepo } from './repo'
 
 /**
@@ -24,6 +25,7 @@ import type { TripRepo } from './repo'
  *   trips/{tripId}/plans/{id}   일정
  *   trips/{tripId}/expenses/{id} 지출
  *   trips/{tripId}/photos/{id}  장소 사진 (줄인 JPEG, 장소별로만 받아 옴)
+ *   trips/{tripId}/personal/{이 폰 열쇠}/expenses/{id}  내 지출 (이 폰에만, 열쇠를 아는 폰만 읽음)
  *
  * persistentLocalCache: 폰 안(IndexedDB)에 사본을 둬서
  * 지하철 등에서 끊겨도 보고 입력할 수 있고, 연결되면 자동 동기화된다.
@@ -87,6 +89,26 @@ export function createCloudRepo(config: FirebaseOptions): TripRepo {
 
     deleteItem(tripId, name, id) {
       return deleteDoc(doc(db, 'trips', tripId, name, id))
+    },
+
+    watchMine(tripId, onData, onError) {
+      return onSnapshot(
+        collection(db, 'trips', tripId, 'personal', myKey(), 'expenses'),
+        (snap) => onData(snap.docs.map((d) => d.data() as Expense)),
+        onError,
+      )
+    },
+
+    saveMine(tripId, item) {
+      return setDoc(doc(db, 'trips', tripId, 'personal', myKey(), 'expenses', item.id), item)
+    },
+
+    patchMine(tripId, id, changes) {
+      return updateDoc(doc(db, 'trips', tripId, 'personal', myKey(), 'expenses', id), changes as DocumentData)
+    },
+
+    deleteMine(tripId, id) {
+      return deleteDoc(doc(db, 'trips', tripId, 'personal', myKey(), 'expenses', id))
     },
 
     watchPhotos(tripId, planId, onData, onError) {

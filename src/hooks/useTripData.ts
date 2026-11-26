@@ -32,6 +32,18 @@ export function useTripData(tripId: string | null) {
   return { trip, plans, expenses, error }
 }
 
+/** 내 지출 (이 폰에만 보이는 개인 지출): 가계부 [내 지출]과 장소 카드에서 씀 */
+export function useMyExpenses(tripId: string | null) {
+  const [mine, setMine] = useState<Expense[]>([])
+  useEffect(() => {
+    if (!tripId) return
+    setMine([])
+    // 못 불러와도(서버 규칙 배포 전 등) 함께 보는 화면은 그대로 쓰게 조용히 빈 목록
+    return repo.watchMine(tripId, (xs) => setMine(cleanExpenses(xs)), () => setMine([]))
+  }, [tripId])
+  return mine
+}
+
 export function useOnline() {
   const [online, setOnline] = useState(() => navigator.onLine)
   useEffect(() => {

@@ -13,6 +13,7 @@ export interface Backup {
   trip: Trip
   plans: Plan[]
   expenses: Expense[]
+  mine?: Expense[] // 이 폰의 내 지출 (폰을 바꾸거나 초기화해도 되살릴 수 있게). 예전 백업엔 없음
 }
 
 type Obj = Record<string, unknown>
@@ -85,7 +86,7 @@ export function normalizeExpense(x: unknown): Expense | null {
   }
 }
 
-export function parseBackup(text: string): { plans: Plan[]; expenses: Expense[] } {
+export function parseBackup(text: string): { plans: Plan[]; expenses: Expense[]; mine: Expense[] } {
   let data: Obj
   try {
     data = JSON.parse(text) as Obj
@@ -98,5 +99,6 @@ export function parseBackup(text: string): { plans: Plan[]; expenses: Expense[] 
   return {
     plans: data.plans.map(normalizePlan).filter((p): p is Plan => p !== null),
     expenses: data.expenses.map(normalizeExpense).filter((e): e is Expense => e !== null),
+    mine: Array.isArray(data.mine) ? data.mine.map(normalizeExpense).filter((e): e is Expense => e !== null) : [],
   }
 }

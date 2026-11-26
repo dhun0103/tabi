@@ -17,24 +17,31 @@ import { CategoryPage } from './expenses/CategoryPage'
 import { PeriodSelect, type Period } from './expenses/PeriodSelect'
 import { ExpenseSheet } from './expenses/ExpenseSheet'
 import { CategoryIcon } from './icons'
-import { MINT, cardCls } from './ui'
+import { BLUE, MINT, cardCls } from './ui'
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
 type SheetState = { kind: 'edit'; expense: Expense | null; date?: string } | { kind: 'stats' } | null
+type Book = 'ours' | 'mine'
 
 /**
  * 여행 비용 (트리플 "여행비용" 구조)
- *   맨 위: 총액 + 기간 필터 · 오른쪽 위 원그래프 버튼 → 카테고리별 지출 페이지
- *   목록: 여행 준비 → Day 1 → … → 여행 후, 섹션마다 "비용 추가"
+ *   맨 위: [우리 여행 | 내 지출] + 원그래프 버튼 → 카테고리별 지출 페이지 · 기간 필터 · 총액
+ *     (자물쇠·"이 폰에만" 같은 숨기는 느낌의 표시는 일부러 안 씀)
+ *     우리 여행 = 일행과 함께 보는 지출 · 내 지출 = 이 폰에만 보이는 개인 지출 (우리 여행 합계·1인당에 안 들어감)
+ *     정산·"누가 얼마" 같은 건 없음: 내 지출은 그냥 따로 모아 두는 내 공책
+ *   목록: 여행 준비 → Day 1 → … → 여행 후, 섹션마다 "비용 추가" (내 지출에서 누르면 내 지출로 추가)
  */
-export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: Expense[]; plans: Plan[] }) {
+export function ExpensesTab({ trip, expenses, mine, plans }: { trip: Trip; expenses: Expense[]; mine: Expense[]; plans: Plan[] }) {
   const days = useMemo(() => tripDays(trip.startDate, trip.endDate), [trip.startDate, trip.endDate])
+  const [book, setBook] = useState<Book>('ours') // 가계부를 열면 늘 우리 여행부터
+  const isMine = book === 'mine'
+  const list = isMine ? mine : expenses
   const [filter, setFilter] = useState('all')
   const [sheet, setSheet] = useState<SheetState>(null)
   const rate = trip.krwPer100Jpy // 기본 환율: 환율이 저장 안 된 예전 지출에만 쓰임
   const krw = (e: Expense) => expenseKRW(e, rate) // 지출마다 적을 때의 환율
-  const group = trip.members.length >= 2
+  const group = trip.members.length >= 2 && !isMine // 1인당은 우리 여행에서만
 
   const bucketOf = (e: Expense) => (!e.date || e.date < trip.startDate ? 'pre' : e.date > trip.endDate ? 'post' : e.date)
   const today = useToday()
@@ -44,7 +51,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
     { key: 'post', title: '여행 후', sub: '', date: addDays(trip.endDate || trip.startDate, 1) },
   ]
   const itemsOf = (key: string) =>
-    expenses.filter((e) => bucketOf(e) === key).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
+    list.filter((e) => bucketOf(e) === key).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
   const visible = sections.filter((s) => (filter === 'all' ? s.key !== 'post' || itemsOf('post').length > 0 : s.key === filter))
   // 기간 고르기: 기간 전체 · 여행 준비 · Day 1… ("여행 후"는 뺌, 여행 후 지출은 기간 전체에서 보임)
   const periods: Period[] = [
@@ -52,25 +59,48 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
     ...sections.filter((s) => s.key !== 'post').map((s) => ({ value: s.key, label: s.title, sub: s.key === 'pre' ? undefined : s.sub })),
   ]
 
-  const scoped = filter === 'all' ? expenses : itemsOf(filter)
+  const scoped = filter === 'all' ? list : itemsOf(filter)
   const total = sum(scoped.map(krw))
   const jpy = sum(scoped.filter((e) => e.currency === 'JPY').map((e) => e.amount))
   const perPerson = group ? total / trip.members.length : 0 // 고른 기간의 합계를 일행 수로 나눔
   const placeOf = (e: Expense) => (e.planId ? plans.find((p) => p.id === e.planId)?.title : '')
 
   // 고치던 지출을 일행이 지웠으면 창을 닫고 알려 줌 (그대로 두면 저장할 때 되살아남)
-  const editingGone = sheet?.kind === 'edit' && !!sheet.expense && !expenses.some((e) => e.id === sheet.expense!.id)
+  const editingGone = sheet?.kind === 'edit' && !!sheet.expense && !list.some((e) => e.id === sheet.expense!.id)
   useEffect(() => {
     if (!editingGone) return
     setSheet(null)
-    void showAlert('일행이 이 지출을 지웠어요')
+    void showAlert(isMine ? '이 지출이 지워졌어요' : '일행이 이 지출을 지웠어요')
   }, [editingGone])
 
   return (
     <>
       <div className="px-4 pt-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-[20px] font-extrabold tracking-tight">여행 비용</h2>
+        <div className="flex items-center justify-between gap-3">
+          {/* 우리 여행 ↔ 내 지출 (이 폰에만) */}
+          <div className="flex rounded-full bg-white p-1 shadow-sm ring-1 ring-neutral-200" role="tablist" aria-label="가계부 종류">
+            {(
+              [
+                ['ours', '우리 여행'],
+                ['mine', '내 지출'],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={book === k}
+                onClick={() => {
+                  setBook(k)
+                  setSheet(null)
+                }}
+                className={`rounded-full px-4 py-2 text-[14px] font-bold transition-colors ${book === k ? 'text-white' : 'text-neutral-500'}`}
+                style={book === k ? { background: BLUE } : undefined}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={() => setSheet({ kind: 'stats' })}
@@ -89,7 +119,9 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
         </div>
 
         <div className={`${cardCls} mt-3 p-5`}>
-          <p className="text-[13px] text-neutral-500">{filter === 'all' ? '총 지출' : `${sections.find((s) => s.key === filter)?.title} 지출`}</p>
+          <p className="text-[13px] text-neutral-500">
+            {filter === 'all' ? (isMine ? '내 지출' : '총 지출') : `${sections.find((s) => s.key === filter)?.title} ${isMine ? '내 지출' : '지출'}`}
+          </p>
           <p className="mt-1 text-[34px] font-extrabold leading-tight tracking-tight">{fmtKRW(total)}</p>
           <p className="mt-1 text-[13px] text-neutral-500">
             엔화 {fmtJPY(jpy)}
@@ -162,6 +194,7 @@ export function ExpensesTab({ trip, expenses, plans }: { trip: Trip; expenses: E
           plans={plans}
           initial={sheet.expense}
           prefill={sheet.date ? { date: sheet.date } : undefined}
+          mine={isMine}
           onClose={() => setSheet(null)}
         />
       )}

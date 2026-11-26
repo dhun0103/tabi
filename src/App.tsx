@@ -4,7 +4,7 @@ import { Onboarding } from './components/Onboarding'
 import { PlansTab } from './components/plans/PlansTab'
 import { SettingsTab } from './components/SettingsTab'
 import { useToday } from './hooks/useToday'
-import { useOnline, useTripData } from './hooks/useTripData'
+import { useMyExpenses, useOnline, useTripData } from './hooks/useTripData'
 import { forgetTrip, loadCurrent, rememberTrip, saveCurrent } from './lib/session'
 import { ddayLabel, fmtDay, parseTripId } from './lib/util'
 import { repo } from './store'
@@ -17,6 +17,7 @@ export default function App() {
   const [tripId, setTripId] = useState<string | null>(() => parseTripId(location.hash) ?? loadCurrent())
   const [tab, setTab] = useState<Tab>('plans')
   const { trip, plans, expenses, error } = useTripData(tripId)
+  const mine = useMyExpenses(tripId) // 내 지출 (이 폰에만)
   const online = useOnline()
 
   // 주소창에도 여행 ID를 남겨 둔다 → 그 상태로 "홈 화면에 추가"해도 같은 여행이 열림
@@ -87,9 +88,9 @@ export default function App() {
     <div className="min-h-dvh bg-[#f4f5f8] text-neutral-900">
       <Header trip={trip} online={online} />
       <main className="mx-auto max-w-lg" style={{ paddingBottom: 'calc(140px + env(safe-area-inset-bottom))' }}>
-        {tab === 'plans' && <PlansTab trip={trip} plans={plans} expenses={expenses} />}
-        {tab === 'expenses' && <ExpensesTab trip={trip} expenses={expenses} plans={plans} />}
-        {tab === 'settings' && <SettingsTab key={trip.id} trip={trip} plans={plans} expenses={expenses} onLeave={leave} />}
+        {tab === 'plans' && <PlansTab trip={trip} plans={plans} expenses={expenses} mine={mine} />}
+        {tab === 'expenses' && <ExpensesTab trip={trip} expenses={expenses} mine={mine} plans={plans} />}
+        {tab === 'settings' && <SettingsTab key={trip.id} trip={trip} plans={plans} expenses={expenses} mine={mine} onLeave={leave} />}
       </main>
       <TabBar tab={tab} onChange={setTab} />
     </div>

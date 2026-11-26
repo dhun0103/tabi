@@ -1,7 +1,10 @@
+import { newId } from './util'
+
 /** 이 기기에서 "지금 보고 있는 여행"과 "최근 연 여행" 기억 (localStorage) */
 
 const CURRENT = 'tn:current'
 const RECENT = 'tn:recent'
+const ME = 'tn:me'
 
 export interface RecentTrip {
   id: string
@@ -46,4 +49,21 @@ export function rememberTrip(t: RecentTrip) {
 
 export function forgetTrip(id: string) {
   set(RECENT, JSON.stringify(loadRecent().filter((r) => r.id !== id)))
+}
+
+/**
+ * 이 폰의 열쇠: 내 지출(이 폰에만 보이는 개인 지출)을 서버에 둘 자리 이름
+ *   처음 쓸 때 20자 랜덤으로 만들어 이 폰에만 기억 → 일행 폰은 이 열쇠를 몰라서 내 지출을 못 읽음
+ *   폰을 초기화하면 열쇠도 없어지므로 내 지출은 설정의 JSON 백업에 같이 담음
+ */
+let meCache: string | null = null
+export function myKey(): string {
+  if (meCache) return meCache
+  let k = get(ME)
+  if (!k || !/^[0-9A-Za-z]{20,64}$/.test(k)) {
+    k = newId()
+    set(ME, k)
+  }
+  meCache = k
+  return k
 }

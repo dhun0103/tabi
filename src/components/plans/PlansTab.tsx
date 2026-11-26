@@ -22,13 +22,14 @@ type SheetState =
   | { kind: 'place'; plan: Plan | null }
   | { kind: 'memo'; plan: Plan | null }
   | { kind: 'flight'; plan: Plan | null }
-  | { kind: 'expense'; plan: Plan; expense: Expense | null }
+  | { kind: 'expense'; plan: Plan; expense: Expense | null; mine?: boolean } // mine: 내 지출(이 폰에만)을 고치는 중
   | null
 
 // 맨 아래 [메모 추가] [항공편 추가] [장소 추가]: 같은 너비, 흰 바탕 + 연한 테두리 (NOL처럼)
 const addBtn = 'rounded-lg border border-neutral-200 bg-white py-3 text-[15px] font-semibold text-neutral-700 active:bg-neutral-50'
 
-export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[]; expenses: Expense[] }) {
+/** mine: 내 지출 (이 폰에만). 일정 카드의 쓴 돈에는 안 넣고, 장소 카드에서만 따로 보여 줌 */
+export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: Plan[]; expenses: Expense[]; mine: Expense[] }) {
   const days = useMemo(() => tripDays(trip.startDate, trip.endDate), [trip.startDate, trip.endDate])
   // 여행 중이면 오늘, 아니면 Day 1부터 (전체 보기는 없음: 트리플처럼 하루씩)
   const [picked, setPicked] = useState(() => (days.includes(todayStr()) ? todayStr() : (days[0] ?? UNDATED)))
@@ -240,7 +241,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
   const sheetPlan = sheet?.plan ? (plans.find((p) => p.id === sheet.plan!.id) ?? sheet.plan) : null
   // 열어 둔 창의 항목을 일행이 지웠으면 창을 닫고 알려 줌 (그대로 두면 고칠 때 지운 게 되살아남)
   const gone =
-    sheet?.kind === 'expense' && sheet.expense && !expenses.some((e) => e.id === sheet.expense!.id)
+    sheet?.kind === 'expense' && sheet.expense && !(sheet.mine ? mine : expenses).some((e) => e.id === sheet.expense!.id)
       ? '지출'
       : sheet?.plan && !plans.some((p) => p.id === sheet.plan!.id)
         ? '항목'
@@ -387,11 +388,12 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
           tripId={trip.id}
           plan={sheetPlan}
           expenses={expensesOf(sheetPlan.id)}
+          mine={mine.filter((e) => e.planId === sheetPlan.id)}
           rate={trip.krwPer100Jpy}
           suggestTime={suggestTime(plans, sheetPlan.date, sheetPlan.id)}
           onUpdate={(changes) => updatePlan(sheetPlan, changes)}
           onAddExpense={() => setSheet({ kind: 'expense', plan: sheetPlan, expense: null })}
-          onOpenExpense={(e) => setSheet({ kind: 'expense', plan: sheetPlan, expense: e })}
+          onOpenExpense={(e, isMine) => setSheet({ kind: 'expense', plan: sheetPlan, expense: e, mine: isMine })}
           onEdit={() => setSheet({ kind: 'place', plan: sheetPlan })}
           onClose={() => setSheet(null)}
         />
@@ -409,6 +411,7 @@ export function PlansTab({ trip, plans, expenses }: { trip: Trip; plans: Plan[];
             category: categoryFromKind(sheetPlan.kind),
             planId: sheetPlan.id,
           }}
+          mine={sheet.mine}
           onClose={() => setSheet({ kind: 'detail', plan: sheetPlan })}
         />
       )}

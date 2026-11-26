@@ -1,4 +1,4 @@
-import type { ListItem, ListName, Photo, Trip } from '../types'
+import type { Expense, ListItem, ListName, Photo, Trip } from '../types'
 
 export type Unsubscribe = () => void
 
@@ -29,6 +29,16 @@ export interface TripRepo {
    */
   patchItem<N extends ListName>(tripId: string, name: N, id: string, changes: Partial<ListItem<N>>): Promise<void>
   deleteItem(tripId: string, name: ListName, id: string): Promise<void>
+
+  /**
+   * 내 지출 (이 폰에만 보이는 개인 지출): 여행 안의 "이 폰 열쇠"(myKey) 자리에 따로 저장
+   *   일행 폰은 열쇠를 몰라서 못 읽고, 함께 보는 지출 목록·합계·1인당에도 안 섞임
+   *   (예전 버전 앱은 이 자리를 아예 모르니 일행 폰이 업데이트 전이어도 안 보임)
+   */
+  watchMine(tripId: string, onData: (items: Expense[]) => void, onError: (err: Error) => void): Unsubscribe
+  saveMine(tripId: string, item: Expense): Promise<void>
+  patchMine(tripId: string, id: string, changes: Partial<Expense>): Promise<void>
+  deleteMine(tripId: string, id: string): Promise<void>
 
   /** 장소 하나의 사진만 (사진은 커서 여행 전체를 한꺼번에 받지 않음) */
   watchPhotos(tripId: string, planId: string, onData: (photos: Photo[]) => void, onError: (err: Error) => void): Unsubscribe

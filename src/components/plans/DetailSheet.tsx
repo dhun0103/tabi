@@ -15,11 +15,12 @@ interface Props {
   tripId: string
   plan: Plan
   expenses: Expense[] // 이 장소에 연결된 지출
+  mine: Expense[] // 이 장소에 연결된 내 지출 (이 폰에만)
   rate: number // 기본 환율 (환율이 저장 안 된 예전 지출용)
   suggestTime: string // 시간이 없을 때 시간 창에 먼저 보여 줄 값
   onUpdate: (changes: Pick<Partial<Plan>, 'time' | 'memo'>) => void
   onAddExpense: () => void
-  onOpenExpense: (e: Expense) => void
+  onOpenExpense: (e: Expense, mine: boolean) => void
   onEdit: () => void
   onClose: () => void
 }
@@ -31,12 +32,45 @@ interface Props {
  *   [지출 추가]  ·  일정 수정·삭제
  * 상세 보기(평점·영업시간 등)는 없음 → 구글 장소 상세 요청도 하지 않음
  */
-export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
+export function DetailSheet({ tripId, plan, expenses, mine, rate, suggestTime, onUpdate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
   const [timeOpen, setTimeOpen] = useState(false)
   const [memoOpen, setMemoOpen] = useState(false)
   const [memoText, setMemoText] = useState('')
-  const total = expenses.reduce((a, e) => a + expenseKRW(e, rate), 0) // 지출마다 적을 때의 환율
+  const sumKRW = (list: Expense[]) => list.reduce((a, e) => a + expenseKRW(e, rate), 0) // 지출마다 적을 때의 환율
   const meta = [kindLabel(plan.kind), areaLabel(plan)].filter(Boolean).join(' · ')
+
+  /**
+   * 이 장소에서 쓴 돈(함께) / 내 지출(이 폰에만, 따로 한 덩어리): 합계 줄 + 연한 회색 상자 안 내역
+   * 내 지출은 함께 쓴 돈 합계에 안 섞음 (일행 폰과 같은 합계가 보이게)
+   */
+  const spentBlock = (list: Expense[], isMine: boolean) => (
+    <div className="py-2.5">
+      {/* pr-3: 아래 상자 안쪽 여백만큼 들여서 합계와 내역 금액의 오른쪽 끝을 한 줄에 맞춤 */}
+      <div className="flex items-center gap-3 pr-3 text-[15px]">
+        <span className="text-neutral-500">
+          <WalletIcon />
+        </span>
+        <span className="flex-1 text-neutral-700">{isMine ? '내 지출' : '이 장소에서 쓴 돈'}</span>
+        <span className="font-bold tabular-nums">{fmtKRW(sumKRW(list))}</span>
+      </div>
+      {/* 내역이 위 합계에 들어 있는 느낌: 합계 글자 줄에 맞춘 연한 회색 상자로 묶고, 금액은 합계보다 한 단계 가볍게 */}
+      <ul className="ml-8 mt-2 divide-y divide-black/[0.05] rounded-xl bg-[#F5F6F8] px-3">
+        {list.map((e) => (
+          <li key={e.id}>
+            <button type="button" onClick={() => onOpenExpense(e, isMine)} className="flex w-full items-center gap-2 py-2.5 text-left text-[14px] active:opacity-70">
+              {/* 카테고리는 늘 맨 앞에 민트 알약(아이콘 + 이름), 그 뒤에 지출 이름 (이름이 없으면 비워 둠) */}
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[12px] font-semibold" style={{ background: MINT_SOFT, color: MINT_INK }}>
+                <CategoryIcon category={e.category} className="h-3.5 w-3.5" />
+                {categoryOf(e.category).label}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-neutral-700">{e.title}</span>
+              <span className="font-medium tabular-nums text-neutral-600">{fmtMoney(e.amount, e.currency)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 
   return (
     <Sheet title={plan.title} subtitle={meta ? <p className="text-[13px] text-neutral-500">{meta}</p> : undefined} onClose={onClose}>
@@ -87,34 +121,8 @@ export function DetailSheet({ tripId, plan, expenses, rate, suggestTime, onUpdat
 
         <PlacePhotos tripId={tripId} planId={plan.id} />
 
-        {expenses.length > 0 && (
-          <div className="py-2.5">
-            {/* pr-3: 아래 상자 안쪽 여백만큼 들여서 합계와 내역 금액의 오른쪽 끝을 한 줄에 맞춤 */}
-            <div className="flex items-center gap-3 pr-3 text-[15px]">
-              <span className="text-neutral-500">
-                <WalletIcon />
-              </span>
-              <span className="flex-1 text-neutral-700">이 장소에서 쓴 돈</span>
-              <span className="font-bold tabular-nums">{fmtKRW(total)}</span>
-            </div>
-            {/* 내역이 위 합계에 들어 있는 느낌: 합계 글자 줄에 맞춘 연한 회색 상자로 묶고, 금액은 합계보다 한 단계 가볍게 */}
-            <ul className="ml-8 mt-2 divide-y divide-black/[0.05] rounded-xl bg-[#F5F6F8] px-3">
-              {expenses.map((e) => (
-                <li key={e.id}>
-                  <button type="button" onClick={() => onOpenExpense(e)} className="flex w-full items-center gap-2 py-2.5 text-left text-[14px] active:opacity-70">
-                    {/* 카테고리는 늘 맨 앞에 민트 알약(아이콘 + 이름), 그 뒤에 지출 이름 (이름이 없으면 비워 둠) */}
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full py-0.5 pl-1.5 pr-2 text-[12px] font-semibold" style={{ background: MINT_SOFT, color: MINT_INK }}>
-                      <CategoryIcon category={e.category} className="h-3.5 w-3.5" />
-                      {categoryOf(e.category).label}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-neutral-700">{e.title}</span>
-                    <span className="font-medium tabular-nums text-neutral-600">{fmtMoney(e.amount, e.currency)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {expenses.length > 0 && spentBlock(expenses, false)}
+        {mine.length > 0 && spentBlock(mine, true)}
       </div>
 
       <div>

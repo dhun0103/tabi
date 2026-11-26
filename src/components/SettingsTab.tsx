@@ -12,8 +12,8 @@ const isTouch = () => matchMedia('(pointer: coarse)').matches
 const btnLine =
   'flex-1 rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 active:bg-neutral-50'
 
-export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expense[]; onLeave: () => void }) {
-  const { trip, plans, expenses, onLeave } = props
+export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expense[]; mine: Expense[]; onLeave: () => void }) {
+  const { trip, plans, expenses, mine, onLeave } = props
   const [name, setName] = useState(trip.name)
   const [start, setStart] = useState(trip.startDate)
   const [end, setEnd] = useState(trip.endDate)
@@ -59,7 +59,8 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
   }
 
   const exportBackup = async () => {
-    const data: Backup = { app: 'tabi', version: 1, exportedAt: new Date().toISOString(), trip, plans, expenses }
+    // 내 지출(이 폰에만)도 같이: 폰을 바꾸거나 초기화하면 이 백업으로만 되살릴 수 있음
+    const data: Backup = { app: 'tabi', version: 1, exportedAt: new Date().toISOString(), trip, plans, expenses, mine }
     const fileName = `tabi-${trip.name}-${todayStr()}.json`.replace(/[\\/:*?"<>|]/g, '_')
     const file = new File([JSON.stringify(data, null, 2)], fileName, { type: 'application/json' })
     if (isTouch() && navigator.canShare?.({ files: [file] })) {
@@ -82,10 +83,10 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
 
   const importBackup = async (file: File) => {
     try {
-      const { plans: ps, expenses: es } = parseBackup(await file.text())
+      const { plans: ps, expenses: es, mine: ms } = parseBackup(await file.text())
       const ok = await askConfirm({
-        title: `일정 ${ps.length}개, 지출 ${es.length}개를 이 여행에 합칠까요?`,
-        message: '같은 항목은 백업 내용으로 덮어써요',
+        title: `일정 ${ps.length}개, 지출 ${es.length}개${ms.length ? `, 내 지출 ${ms.length}개` : ''}를 이 여행에 합칠까요?`,
+        message: ms.length ? '같은 항목은 백업 내용으로 덮어써요. 내 지출은 이 폰의 내 지출로 들어가요' : '같은 항목은 백업 내용으로 덮어써요',
         confirmLabel: '합치기',
       })
       if (!ok) return
@@ -98,7 +99,8 @@ export function SettingsTab(props: { trip: Trip; plans: Plan[]; expenses: Expens
       }
       ps.forEach((p) => repo.saveItem(trip.id, 'plans', p).catch(onErr))
       es.forEach((e) => repo.saveItem(trip.id, 'expenses', e).catch(onErr))
-      setMsg(`가져왔어요: 일정 ${ps.length}개, 지출 ${es.length}개`)
+      ms.forEach((e) => repo.saveMine(trip.id, e).catch(onErr))
+      setMsg(`가져왔어요: 일정 ${ps.length}개, 지출 ${es.length}개${ms.length ? `, 내 지출 ${ms.length}개` : ''}`)
     } catch (e) {
       void showAlert('가져오지 못했어요', e instanceof Error ? e.message : String(e))
     }

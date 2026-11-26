@@ -5,7 +5,7 @@ import { repo } from '../../store'
 import type { Category, Currency, Expense, PayMethod, Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
 import { RateField } from '../RateField'
-import { Chip, Field, Group, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
+import { BLUE, Chip, Field, Group, Sheet, btnDanger, btnPrimary, inputCls, reportError } from '../ui'
 
 /**
  * 이 지출의 환율이 어디서 왔나
@@ -26,6 +26,8 @@ interface Props {
   plans: Plan[]
   initial: Expense | null
   prefill?: ExpensePrefill // 일정의 장소에서 열었을 때 미리 채울 값
+  /** 내 지출(이 폰에만)인가: 수정이면 그 지출이 지금 있는 곳, 새 지출이면 "내 지출로" 스위치의 처음 값 */
+  mine?: boolean
   onClose: () => void
 }
 
@@ -33,8 +35,12 @@ interface Props {
  * 지출 입력·수정. 가계부 탭에서도, 일정의 장소에서도 연다
  * 날짜·연결된 장소는 연 곳에서 정해지고(가계부의 Day 칸, 장소 카드) 창에서는 고르지 않는다
  * "누가 냈나요"·"나누기" 칸은 없앰: 새 지출은 일행 첫 사람 · 다 같이 나눔으로 저장, 예전 지출의 값은 그대로 둠
+ * 맨 아래 "내 지출로" 스위치: 켜면 이 폰에만 보이는 내 지출에 저장 (우리 여행 합계에 안 들어감).
+ *   고칠 때 스위치를 바꾸면 우리 여행 ↔ 내 지출로 옮김
  */
-export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) {
+export function ExpenseSheet({ trip, plans, initial, prefill, mine = false, onClose }: Props) {
+  const wasMine = !!initial && mine // 고치는 지출이 원래 내 지출이었나
+  const [isMine, setIsMine] = useState(mine)
   const [amount, setAmount] = useState(initial ? String(initial.amount) : '')
   const [currency, setCurrency] = useState<Currency>(initial?.currency ?? 'JPY')
   const [category, setCategory] = useState<Category>(initial?.category ?? prefill?.category ?? 'food')
@@ -129,32 +135,42 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
       category,
       method,
       payer: initial?.payer ?? trip.members[0] ?? '',
-      shared: initial?.shared ?? true,
+      // 내 지출은 나누지 않는 내 돈, 우리 여행으로 되돌리면 다시 함께 쓴 돈 (예전 지출의 값은 그대로)
+      shared: isMine ? false : wasMine ? true : (initial?.shared ?? true),
       memo,
       planId,
       createdAt: initial?.createdAt ?? now,
       updatedAt: now,
     }
-    if (initial) {
-      // 수정: 바꾼 칸만 (그사이 일행이 고친 다른 칸은 그대로, 일행이 지운 지출은 되살리지 않음)
+    const saveTo = (toMine: boolean, e: Expense) => (toMine ? repo.saveMine(trip.id, e) : repo.saveItem(trip.id, 'expenses', e))
+    if (initial && wasMine === isMine) {
+      // 같은 곳에서 수정: 바꾼 칸만 (그사이 일행이 고친 다른 칸은 그대로, 일행이 지운 지출은 되살리지 않음)
       const { title: t, amount: a, currency: c, krwPer100Jpy: k, rateDate: d, category: g, method: m } = expense
       const changes = changedFields(initial, { title: t, amount: a, currency: c, krwPer100Jpy: k, rateDate: d, category: g, method: m })
-      if (Object.keys(changes).length) repo.patchItem(trip.id, 'expenses', initial.id, { ...changes, updatedAt: now }).catch(reportError)
+      if (Object.keys(changes).length) {
+        const patch = { ...changes, updatedAt: now }
+        ;(isMine ? repo.patchMine(trip.id, initial.id, patch) : repo.patchItem(trip.id, 'expenses', initial.id, patch)).catch(reportError)
+      }
+    } else if (initial) {
+      // 우리 여행 ↔ 내 지출로 옮김: 새 자리에 저장이 끝난 뒤에 원래 자리에서 지움 (저장이 실패하면 원래 것은 남김)
+      saveTo(isMine, expense)
+        .then(() => (wasMine ? repo.deleteMine(trip.id, initial.id) : repo.deleteItem(trip.id, 'expenses', initial.id)))
+        .catch(reportError)
     } else {
-      repo.saveItem(trip.id, 'expenses', expense).catch(reportError)
+      saveTo(isMine, expense).catch(reportError)
     }
     onClose()
   }
 
   const remove = async () => {
     if (!initial || !(await askConfirm({ title: '이 지출을 삭제할까요?', confirmLabel: '삭제', danger: true }))) return
-    repo.deleteItem(trip.id, 'expenses', initial.id).catch(reportError)
+    ;(wasMine ? repo.deleteMine(trip.id, initial.id) : repo.deleteItem(trip.id, 'expenses', initial.id)).catch(reportError)
     onClose()
   }
 
   return (
     <Sheet
-      title={initial ? '지출 수정' : linked ? `${linked.title}에서 쓴 돈` : '지출 추가'}
+      title={initial ? (isMine ? '내 지출 수정' : '지출 수정') : linked ? `${linked.title}에서 쓴 돈` : isMine ? '내 지출 추가' : '지출 추가'}
       subtitle={<p className="truncate text-[13px] text-neutral-500">{[when, where].filter(Boolean).join(' · ')}</p>}
       onClose={onClose}
       footer={
@@ -240,6 +256,24 @@ export function ExpenseSheet({ trip, plans, initial, prefill, onClose }: Props) 
           </Chip>
         ))}
       </Group>
+
+      {/* 내 지출로: 켜면 이 폰에만 보이는 내 지출에 저장 (일행 폰에 안 보이고 우리 여행 합계에도 안 들어감)
+          자물쇠·"이 폰에만" 같은 숨기는 느낌의 표시는 일부러 안 씀 */}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={isMine}
+        onClick={() => setIsMine((v) => !v)}
+        className="flex w-full items-center gap-3 rounded-xl bg-neutral-50 px-3.5 py-3 text-left ring-1 ring-neutral-200 active:bg-neutral-100"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold text-neutral-800">내 지출로</span>
+          <span className="block text-[12px] leading-4 text-neutral-500">가계부 "내 지출"에 따로 모아 둬요</span>
+        </span>
+        <span className="relative h-6 w-10 shrink-0 rounded-full bg-neutral-300 transition-colors" style={isMine ? { background: BLUE } : undefined} aria-hidden="true">
+          <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left] ${isMine ? 'left-[18px]' : 'left-0.5'}`} />
+        </span>
+      </button>
     </Sheet>
   )
 }

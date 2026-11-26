@@ -19,6 +19,11 @@ service cloud.firestore {
       match /photos/{photoId} {
         allow read, write: if tripId.size() >= 20;
       }
+      // 내 지출 (이 폰에만 보이는 개인 지출): 그 폰만 아는 20자 열쇠 아래에 둠
+      // → 일행 폰은 열쇠를 몰라서 못 읽음 (열쇠 목록 조회는 문서가 없어서 불가)
+      match /personal/{ownerKey}/expenses/{expenseId} {
+        allow read, write: if tripId.size() >= 20 && ownerKey.size() >= 20;
+      }
     }
   }
 }

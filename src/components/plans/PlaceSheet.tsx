@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { areaLabel, centerOf, hasCoords, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { areaLabel, centerOf, hasCoords, placeColor, searchPlacesFree, type LatLng, type PlaceResult } from '../../lib/geo'
 import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type GoogleSuggestion } from '../../lib/google'
 import { orderForInsert } from '../../lib/order'
-import { changedFields, dayText, kindLabel, newId, suggestTime } from '../../lib/util'
+import { categoryFromKind, changedFields, dayText, kindLabel, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
 import type { Plan, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
@@ -27,9 +27,50 @@ interface Props {
   onClose: () => void
 }
 
+/** 이 여행에 이미 넣은 장소 하나 (같은 곳은 하나로 묶음) */
+interface SavedSpot {
+  result: PlaceResult
+  where: string // "Day 1, Day 4" / "가고 싶은 곳"
+  search: string // 검색어 비교용 (이름 + 현지어 이름, 소문자)
+}
+
+const SAVED_PREVIEW = 5 // 처음엔 이만큼만, 나머지는 [더 보기]
+
+/**
+ * 이 여행에 넣은 장소: 다시 검색하지 않고 바로 고르기 (숙소처럼 여러 날 들르는 곳, 가고 싶은 곳에 모아 둔 곳)
+ *   지도 위치가 있는 장소만, 같은 곳(구글 장소 ID 또는 이름 + 위치)은 하나로 묶고 어느 날에 있는지 같이 보여 줌
+ *   순서: 숙소(매일 들르니까) → 가고 싶은 곳(날짜를 아직 안 정한 후보) → Day 1부터
+ */
+function savedSpots(plans: Plan[], days: string[]): SavedSpot[] {
+  const dayIdx = (d: string) => days.indexOf(d) // 가고 싶은 곳(날짜 없음·여행 밖 날짜)은 -1
+  const rank = (p: Plan) => (categoryFromKind(p.kind) === 'lodging' ? 0 : dayIdx(p.date) < 0 ? 1 : 2)
+  const list = plans
+    .filter((p) => p.type === 'place')
+    .filter(hasCoords)
+    .sort((a, b) => rank(a) - rank(b) || dayIdx(a.date) - dayIdx(b.date) || a.order - b.order)
+  const groups = new Map<string, { plan: (typeof list)[number]; days: Set<number> }>()
+  for (const p of list) {
+    const key = p.placeId || `${p.title}|${p.lat.toFixed(4)},${p.lng.toFixed(4)}`
+    const g = groups.get(key)
+    if (g) g.days.add(dayIdx(p.date))
+    else groups.set(key, { plan: p, days: new Set([dayIdx(p.date)]) })
+  }
+  return [...groups.values()].map(({ plan, days: idx }) => {
+    // Day 순서대로, 가고 싶은 곳은 맨 뒤. 너무 많으면 "외 N"
+    const labels = [...idx].sort((a, b) => (a < 0 ? 1e9 : a) - (b < 0 ? 1e9 : b)).map((i) => (i < 0 ? '가고 싶은 곳' : `Day ${i + 1}`))
+    const where = labels.length > 3 ? `${labels.slice(0, 3).join(', ')} 외 ${labels.length - 3}` : labels.join(', ')
+    return {
+      result: { key: plan.id, name: plan.title, localName: plan.place, lat: plan.lat, lng: plan.lng, kind: plan.kind, area: plan.area, placeId: plan.placeId },
+      where,
+      search: `${plan.title} ${plan.place}`.toLowerCase(),
+    }
+  })
+}
+
 /**
  * 장소 추가·수정
  *   추가: 장소 검색(구글이면 입력하는 동안 자동완성) → 고르기, 못 찾으면 지도에서 직접 찍기
+ *         이 여행에 이미 넣은 장소는 검색 없이 목록에서 바로 고르기 (같은 장소를 이 날에도 하나 더 넣음, 원래 것은 그대로)
  *   수정: 이름·시간·메모만. 장소와 날짜는 그대로 (바꾸려면 삭제하고 그 날에서 새로 추가)
  */
 export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultDate, onClose }: Props) {
@@ -70,6 +111,12 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
   // (직접 고쳐 적은 이름은 그대로 둠)
   const autoName = useRef('')
   useEffect(() => () => abortRef.current?.abort(), [])
+
+  // 이 여행에 이미 넣은 장소: 검색칸이 비어 있으면 목록으로, 입력하면 이름이 맞는 곳을 검색 결과 위에
+  const saved = useMemo(() => savedSpots(allPlans, days), [allPlans, days])
+  const [showAllSaved, setShowAllSaved] = useState(false)
+  const q = query.trim().toLowerCase()
+  const savedHits = q ? saved.filter((s) => s.search.includes(q)).slice(0, 3) : []
 
   // 구글: 입력이 멈추면(0.25초) 자동완성 후보를 가져온다
   useEffect(() => {
@@ -146,6 +193,27 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
       setBusy(false)
     }
   }
+
+  /** 이 여행에 넣은 장소 한 줄: 누르면 검색에서 고른 것처럼 장소가 채워짐 (시간·메모는 새로) */
+  const savedRow = (s: SavedSpot) => (
+    <li key={s.result.key}>
+      <button
+        type="button"
+        onClick={() => choose(s.result)}
+        disabled={busy}
+        className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-neutral-50 disabled:opacity-50"
+      >
+        {/* 종류별 색 점 (일정 번호·지도 핀과 같은 색: 음식점 코랄 · 숙소 민트 · 나머지 보라) */}
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: placeColor(s.result.kind).bg }} aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-medium">{s.result.name}</span>
+          <span className="block truncate text-xs text-neutral-500">
+            {[s.where, kindLabel(s.result.kind), areaLabel(s.result)].filter(Boolean).join(' · ')}
+          </span>
+        </span>
+      </button>
+    </li>
+  )
 
   const pickOnMap = (pos: LatLng) => {
     // 현지어 이름은 검색어가 있을 때만 (없으면 구글맵을 좌표로 연다)
@@ -284,11 +352,40 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
               )}
             </form>
             {!google && <p className="mt-1.5 text-xs text-neutral-400">한국어로 안 나오면 일본어나 영어로 검색해 보세요</p>}
+
+            {/* 검색칸이 비어 있을 때: 이 여행에 넣은 장소 목록 (숙소 → 가고 싶은 곳 → Day 순) */}
+            {!q && saved.length > 0 && (
+              <div className="mt-3">
+                <p className="mb-1.5 text-[12px] font-medium text-neutral-400">이 여행에 넣은 장소</p>
+                <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
+                  {(showAllSaved ? saved : saved.slice(0, SAVED_PREVIEW)).map(savedRow)}
+                </ul>
+                {!showAllSaved && saved.length > SAVED_PREVIEW && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSaved(true)}
+                    className="mt-1 w-full py-2 text-[13px] font-medium text-neutral-500 active:text-neutral-700"
+                  >
+                    더 보기 ({saved.length - SAVED_PREVIEW}곳)
+                  </button>
+                )}
+              </div>
+            )}
+
             {busy && <p className="mt-3 text-sm text-neutral-500">찾는 중…</p>}
             {searchError && <p className="mt-3 text-sm text-red-600">{searchError}</p>}
 
+            {/* 입력 중: 이 여행에 넣은 장소 중 이름이 맞는 곳을 검색 결과 위에 (검색 비용 없이 바로) */}
+            {savedHits.length > 0 && (
+              <>
+                <p className="mb-1.5 mt-3 text-[12px] font-medium text-neutral-400">이 여행에 넣은 장소</p>
+                <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">{savedHits.map(savedRow)}</ul>
+              </>
+            )}
+
             {google && suggestions && (
               <>
+                {savedHits.length > 0 && <p className="-mb-0.5 mt-3 text-[12px] font-medium text-neutral-400">검색 결과</p>}
                 {suggestions.length > 0 ? (
                   <ul className="mt-2 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
                     {suggestions.map((s) => (
@@ -312,6 +409,7 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
               </>
             )}
 
+            {!google && results && savedHits.length > 0 && <p className="-mb-0.5 mt-3 text-[12px] font-medium text-neutral-400">검색 결과</p>}
             {!google &&
               results &&
               (results.length > 0 ? (

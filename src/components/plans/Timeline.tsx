@@ -2,7 +2,7 @@ import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { areaLabel, distanceM, fmtDistance, googleLegUrl, googleSpotUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
 import { flightTitle, kindLabel } from '../../lib/util'
 import type { Plan, SubSpot } from '../../types'
-import { CheckCircleIcon, ExternalIcon, MemoIcon, PencilIcon, PlaneIcon } from '../icons'
+import { ExternalIcon, MemoIcon, PencilIcon, PlaneIcon, SpotBullet } from '../icons'
 import { BLUE } from '../ui'
 import { useDragSort } from './useDragSort'
 
@@ -295,7 +295,7 @@ function SpotList(props: {
   const { parent, spots, activeId } = props
   return (
     <ul className="ml-3 mt-1.5 border-l-2 border-neutral-200 pl-1">
-      {spots.map((s) => {
+      {spots.map((s, j) => {
         const url = googleSpotUrl(s)
         const meta = [kindLabel(s.kind), s.memo].filter(Boolean).join(' · ')
         const on = activeId === `${parent.id}:${s.id}`
@@ -305,11 +305,12 @@ function SpotList(props: {
               type="button"
               role="checkbox"
               aria-checked={s.done}
-              aria-label={`${s.title} 다녀옴`}
+              aria-label={`${j + 1}. ${s.title} 다녀옴`}
               onClick={() => props.onToggle(parent, s.id)}
               className="flex h-11 w-10 shrink-0 items-center justify-center"
             >
-              <CheckCircleIcon checked={s.done} />
+              {/* 번호(지도의 "7-1"과 같은 순서), 다녀오면 파란 체크 */}
+              <SpotBullet n={j + 1} done={s.done} />
             </button>
             <button type="button" onClick={() => props.onFocus(parent, s)} className="min-w-0 flex-1 py-1.5 text-left">
               <span className={`block truncate text-[14px] font-semibold ${s.done ? 'text-neutral-400 line-through' : on ? 'text-[#1F6FD6]' : 'text-neutral-800'}`}>
@@ -381,7 +382,7 @@ function SpotEditList(props: {
         // 바탕색: 끌어서 띄울 때 아래 줄 글자가 비치지 않게 (페이지 바탕과 같은 색)
         <li key={s.id} className="flex items-center rounded-lg bg-[#f4f5f8]">
           <span className="flex h-11 w-10 shrink-0 items-center justify-center" aria-hidden="true">
-            <CheckCircleIcon checked={s.done} />
+            <SpotBullet n={idx + 1} done={s.done} />
           </span>
           {renaming?.id === s.id ? (
             <input

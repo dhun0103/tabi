@@ -8,8 +8,9 @@ const TILE_URL = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'
 
 const icon = (p: MapPin, active: boolean) => {
-  const s = p.small ? 14 : 28 // 들를 곳은 작은 점 (index.css .tn-pin-sm 과 같은 크기)
-  return L.divIcon({ className: 'tn-pin-wrap', html: pinElement(p, active).outerHTML, iconSize: [s, s], iconAnchor: [s / 2, s / 2] })
+  // 들를 곳은 "7-1" 작은 알약 (index.css .tn-pin-sm: 높이 18, 글자 수만큼 넓어져도 .tn-pin-wrap 이 가운데에 둠)
+  const [w, h] = p.small ? [30, 18] : [28, 28]
+  return L.divIcon({ className: 'tn-pin-wrap', html: pinElement(p, active).outerHTML, iconSize: [w, h], iconAnchor: [w / 2, h / 2] })
 }
 
 export function LeafletMap(props: MapProps) {

@@ -115,6 +115,22 @@ export function CheckCircleIcon({ checked, className = 'h-5 w-5' }: { checked: b
   )
 }
 
+/**
+ * 들를 곳 번호 동그라미 ①②③ (지도의 "7-1"과 같은 순서). 다녀왔으면 번호 대신 파란 체크
+ * 누르면 다녀옴 체크 (지금처럼) — 동그라미 자리는 그대로라 줄 모양이 안 바뀜
+ */
+export function SpotBullet({ n, done, className = 'h-5 w-5' }: { n: number; done: boolean; className?: string }) {
+  if (done) return <CheckCircleIcon checked className={className} />
+  return (
+    <span
+      className={`${className} flex shrink-0 items-center justify-center rounded-full border-[1.8px] border-[#B4B8BF] text-[11px] font-bold leading-none text-neutral-500`}
+      aria-hidden="true"
+    >
+      {n}
+    </span>
+  )
+}
+
 /** 들를 곳 (장소 카드의 줄 아이콘): 지도 핀 */
 export function PinIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (

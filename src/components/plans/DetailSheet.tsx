@@ -7,7 +7,7 @@ import { categoryOf, expenseKRW, fmtKRW, fmtMoney, kindLabel, newId } from '../.
 import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
-import { CategoryIcon, CheckCircleIcon, MemoIcon, PinIcon, XIcon } from '../icons'
+import { CategoryIcon, MemoIcon, PinIcon, SpotBullet, XIcon } from '../icons'
 import { TimeDialog } from '../TimePicker'
 import { MINT_INK, MINT_SOFT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
 
@@ -153,17 +153,17 @@ export function DetailSheet({
               <span className="flex-1 text-neutral-700">들를 곳 {spots.length}</span>
             </div>
             <ul className="ml-8 mt-2 divide-y divide-black/[0.05] rounded-xl bg-[#F5F6F8]">
-              {spots.map((s) => (
+              {spots.map((s, j) => (
                 <li key={s.id} className="flex items-center">
                   <button
                     type="button"
                     role="checkbox"
                     aria-checked={s.done}
-                    aria-label={`${s.title} 다녀옴`}
+                    aria-label={`${j + 1}. ${s.title} 다녀옴`}
                     onClick={() => onToggleSpot(s.id)}
                     className="flex h-11 w-10 shrink-0 items-center justify-center"
                   >
-                    <CheckCircleIcon checked={s.done} />
+                    <SpotBullet n={j + 1} done={s.done} />
                   </button>
                   <span className="min-w-0 flex-1 py-2">
                     <span className={`block truncate text-[14px] font-medium ${s.done ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>{s.title}</span>

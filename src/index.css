@@ -50,6 +50,9 @@ body {
 .tn-pin-wrap {
   background: transparent;
   border: 0;
+  /* 무료 지도: 들를 곳 알약은 글자 수만큼 넓어져도 좌표 위 가운데에 */
+  display: flex;
+  justify-content: center;
 }
 
 .tn-pin {
@@ -70,9 +73,14 @@ body {
   box-shadow: 0 0 0 2px #171717, 0 2px 8px rgb(0 0 0 / 0.4);
 }
 
-/* 들를 곳: 숫자 없는 작은 점 (큰 장소 핀 주변에) */
+/* 들를 곳: 흰 바탕 작은 알약 "7-1" (색·테두리는 pinElement 에서) */
 .tn-pin.tn-pin-sm {
-  width: 14px;
-  height: 14px;
-  font-size: 0;
+  width: auto;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
 }

@@ -176,13 +176,23 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
     places.forEach((p, i) => {
       const c = placeColor(p.kind)
       if (hasCoords(p)) pins.push({ id: p.id, lat: p.lat, lng: p.lng, label: String(i + 1), title: p.title, color: c.bg, ink: c.ink })
-      // 들를 곳을 펼친 장소: 그 가게들을 숫자 없는 작은 점으로 (동선 점선엔 안 넣음)
+      // 들를 곳을 펼친 장소: 그 가게들을 "7-1" 흰 알약으로 (목록의 ①②와 같은 순서, 다녀온 곳은 회색, 동선 점선엔 안 넣음)
       if (!editing && expanded.has(p.id)) {
-        for (const s of p.spots ?? []) {
-          if (s.lat === null || s.lng === null) continue
+        ;(p.spots ?? []).forEach((s, j) => {
+          if (s.lat === null || s.lng === null) return
           const sc = placeColor(s.kind)
-          pins.push({ id: `${p.id}:${s.id}`, lat: s.lat, lng: s.lng, label: '', title: s.title, color: sc.bg, ink: sc.ink, small: true })
-        }
+          pins.push({
+            id: `${p.id}:${s.id}`,
+            lat: s.lat,
+            lng: s.lng,
+            label: `${i + 1}-${j + 1}`,
+            title: `${i + 1}-${j + 1} ${s.title}`,
+            color: sc.bg,
+            ink: sc.ink,
+            small: true,
+            done: s.done,
+          })
+        })
       }
     })
     if (view !== UNDATED) routes.push({ color: ROUTE_COLOR, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })

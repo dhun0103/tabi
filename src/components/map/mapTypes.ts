@@ -6,7 +6,8 @@ export interface MapPin extends LatLng {
   title: string // 마우스 올렸을 때 / 스크린리더
   color: string
   ink: string
-  small?: boolean // 들를 곳: 숫자 없는 작은 점
+  small?: boolean // 들를 곳: 흰 바탕 작은 알약 ("7-1")
+  done?: boolean // 들를 곳을 다녀옴 → 회색으로 흐리게
 }
 
 /** 이 점들이 다 보이게 확대 (key가 바뀔 때마다 한 번). 점이 하나면 그 점을 가운데에 zoom 으로 */
@@ -43,13 +44,20 @@ export const FOCUS_ZOOM = 11
 
 /** 핀·동선이 바뀌었을 때만 다시 그리기 위한 키 */
 export const drawKeyOf = (p: MapProps) =>
-  JSON.stringify([p.pins.map((x) => [x.id, x.lat, x.lng, x.label, x.color, x.small]), p.routes?.map((r) => [r.color, r.points]), p.fallbackCenter])
+  JSON.stringify([p.pins.map((x) => [x.id, x.lat, x.lng, x.label, x.color, x.small, x.done]), p.routes?.map((r) => [r.color, r.points]), p.fallbackCenter])
 
 export function pinElement(p: MapPin, active: boolean): HTMLDivElement {
   const el = document.createElement('div')
   el.className = `tn-pin${p.small ? ' tn-pin-sm' : ''}${active ? ' is-active' : ''}`
-  el.style.background = p.color
-  el.style.color = p.ink
+  if (p.small) {
+    // 들를 곳: 흰 바탕 + 종류 색 테두리 + 진한 글자 (큰 장소의 꽉 찬 동그라미와 구별). 다녀온 곳은 회색
+    el.style.background = '#ffffff'
+    el.style.borderColor = p.done ? '#C5CAD1' : p.color
+    el.style.color = p.done ? '#9AA1AB' : '#2B2F36'
+  } else {
+    el.style.background = p.color
+    el.style.color = p.ink
+  }
   el.textContent = p.label
   return el
 }

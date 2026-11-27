@@ -1,18 +1,23 @@
 import type { HTMLAttributes, ReactNode } from 'react'
-import { areaLabel, distanceM, fmtDistance, googleLegUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
+import { areaLabel, distanceM, fmtDistance, googleLegUrl, googleSpotUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
 import { flightTitle, kindLabel } from '../../lib/util'
-import type { Plan } from '../../types'
-import { MemoIcon, PlaneIcon } from '../icons'
+import type { Plan, SubSpot } from '../../types'
+import { CheckCircleIcon, ExternalIcon, MemoIcon, PlaneIcon } from '../icons'
 import { BLUE } from '../ui'
 import { useDragSort } from './useDragSort'
 
 interface Props {
   items: Plan[] // 순서대로 정렬된 하루치
   spent?: Map<string, string> // 장소별로 쓴 돈 (예: ¥3,200)
-  activeId: string | null
+  activeId: string | null // 장소 id, 또는 들를 곳이면 "장소id:들를곳id"
   editing: boolean
   onOpen: (p: Plan) => void
   onFocus: (p: Plan) => void
+  /** 들를 곳을 펼친 장소들 (펼치면 카드 아래에 목록, 지도엔 작은 점) */
+  expanded: Set<string>
+  onToggleExpand: (p: Plan) => void
+  onToggleSpot: (p: Plan, spotId: string) => void // 다녀옴 체크
+  onFocusSpot: (p: Plan, s: SubSpot) => void // 지도에서 그 점으로
   /** 편집 중 ≡ 손잡이를 끌어서(또는 손잡이에서 ↑↓ 키로) 순서를 바꿈: 새 순서(id 목록), 옮긴 항목 */
   onReorder: (nextIds: string[], movedId: string) => void
   /** 화면에서 목록이 보이는 위·아래 경계 (끌 때 그 근처에서 저절로 스크롤) */
@@ -35,7 +40,8 @@ const CIRCLE_TOP = PAD_TOP + TITLE_LH / 2 // 번호 원 중심 = 제목 줄 가�
 const TIME_TOP = PAD_TOP + TITLE_LH + 2 // 시간 칸 위쪽 = 둘째 줄 위쪽 (mt-0.5)
 const TIME_GAP = TIME_TOP + META_LH - CIRCLE_TOP // 시간이 있으면 시간 칸 아래부터 선을 다시 그림
 // 장소·메모 공통 흰 카드 (메모 글줄도 제목 줄과 같은 22px라서 메모 점이 번호 원과 같은 높이에 옴)
-const CARD = 'block min-w-0 flex-1 rounded-xl bg-white px-4 py-3 text-left shadow-[0_1px_3px_rgba(16,24,40,0.08)] ring-1 ring-black/[0.03] active:bg-neutral-50'
+const CARD_BOX = 'min-w-0 flex-1 rounded-xl bg-white shadow-[0_1px_3px_rgba(16,24,40,0.08)] ring-1 ring-black/[0.03]'
+const CARD = `block ${CARD_BOX} px-4 py-3 text-left active:bg-neutral-50`
 
 /** 왼쪽 선 칸: 위/아래 반쪽 선 + 가운데 내용 (gap: 가운데 아래로 선을 비울 길이) */
 /** 번호 원(또는 비행기) 아래 시간 — 카드 둘째 줄과 같은 높이 */
@@ -61,7 +67,21 @@ function Rail(props: { top: boolean; bottom: boolean; center?: number; gap?: num
   )
 }
 
-export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onReorder, edges, onDragChange }: Props) {
+export function Timeline({
+  items,
+  spent,
+  activeId,
+  editing,
+  onOpen,
+  onFocus,
+  expanded,
+  onToggleExpand,
+  onToggleSpot,
+  onFocusSpot,
+  onReorder,
+  edges,
+  onDragChange,
+}: Props) {
   const drag = useDragSort(
     items.map((p) => p.id),
     { onDrop: onReorder, edges, onDragChange },
@@ -152,7 +172,30 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onR
     const pinned = hasCoords(p)
     const meta = [kindLabel(p.kind), areaLabel(p)].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
     const money = spent?.get(p.id)
-    const active = p.id === activeId
+    const active = p.id === activeId || !!activeId?.startsWith(`${p.id}:`) // 들를 곳을 골라도 그 장소 줄을 강조
+    // 들를 곳: 편집 중엔 숨김 (순서 끌기를 단순하게)
+    const spots = editing ? [] : (p.spots ?? [])
+    const open = spots.length > 0 && expanded.has(p.id)
+    const content = (
+      <>
+        <span className="flex items-start gap-2">
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{p.title}</span>
+            {/* 시간이 있으면 둘째 줄 자리를 비워 두더라도 남겨서 시간이 카드 안에 오게 */}
+            {(meta || p.time) && <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">{meta || ' '}</span>}
+          </span>
+          {money && <span className="shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-neutral-700">{money}</span>}
+        </span>
+        {p.memo && (
+          // 장소 메모: ≡ 아이콘으로 메모인 걸 표시 (NOL처럼), 종류·동네보다 진하게
+          // 길어도 줄이지 않고 끝까지 (카드를 누르지 않고 목록에서 바로 읽게). 긴 주소·링크는 카드 안에서 줄바꿈
+          <span className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-5 text-neutral-700">
+            <MemoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+            <span className="min-w-0 whitespace-pre-wrap wrap-anywhere">{p.memo}</span>
+          </span>
+        )}
+      </>
+    )
     // 첫 줄 위쪽 선은 앞에 메모가 있을 때만, 아래쪽 선은 뒤에 뭔가 있을 때만
     rows.push(
       <li key={p.id} id={`plan-${p.id}`} className={`-mx-4 flex px-4 transition-colors ${active ? 'bg-[#ECF4FF]' : ''}`}>
@@ -173,26 +216,45 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onR
             {num}
           </button>
         </Rail>
-        <div className="flex min-w-0 flex-1 py-1.5">
-          <button type="button" onClick={() => onOpen(p)} className={CARD}>
-            <span className="flex items-start gap-2">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[16px] font-bold leading-[22px] text-neutral-900">{p.title}</span>
-                {/* 시간이 있으면 둘째 줄 자리를 비워 두더라도 남겨서 시간이 카드 안에 오게 */}
-                {(meta || p.time) && <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">{meta || '\u00a0'}</span>}
-              </span>
-              {money && <span className="shrink-0 pt-0.5 text-[13px] font-semibold tabular-nums text-neutral-700">{money}</span>}
-            </span>
-            {p.memo && (
-              // 장소 메모: ≡ 아이콘으로 메모인 걸 표시 (NOL처럼), 종류·동네보다 진하게
-              // 길어도 줄이지 않고 끝까지 (카드를 누르지 않고 목록에서 바로 읽게). 긴 주소·링크는 카드 안에서 줄바꿈
-              <span className="mt-2 flex items-start gap-1.5 text-[13px] font-medium leading-5 text-neutral-700">
-                <MemoIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
-                <span className="min-w-0 whitespace-pre-wrap wrap-anywhere">{p.memo}</span>
-              </span>
+        <div className="min-w-0 flex-1 py-1.5">
+          <div className="flex">
+            {spots.length > 0 ? (
+              // 들를 곳이 있으면: 카드 안 아래에 "들를 곳 N" 알약 (누르면 카드 아래에 펼침, 일정 흐름엔 안 나옴)
+              <div className={CARD_BOX}>
+                <button type="button" onClick={() => onOpen(p)} className="block w-full rounded-t-xl px-4 pb-2 pt-3 text-left active:bg-neutral-50">
+                  {content}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onToggleExpand(p)}
+                  aria-expanded={open}
+                  className={`mb-3 ml-4 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold ${
+                    open ? 'bg-[#E6F0FE] text-[#1F6FD6]' : 'bg-neutral-100 text-neutral-500 active:bg-neutral-200'
+                  }`}
+                >
+                  들를 곳 {spots.length}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => onOpen(p)} className={CARD}>
+                {content}
+              </button>
             )}
-          </button>
-          {handle(`${num}번 ${p.title} 순서 바꾸기`)}
+            {handle(`${num}번 ${p.title} 순서 바꾸기`)}
+          </div>
+          {open && <SpotList parent={p} spots={spots} activeId={activeId} onToggle={onToggleSpot} onFocus={onFocusSpot} />}
         </div>
       </li>,
     )
@@ -200,6 +262,60 @@ export function Timeline({ items, spent, activeId, editing, onOpen, onFocus, onR
   })
 
   return <ol ref={drag.listRef}>{rows}</ol>
+}
+
+/**
+ * 펼친 들를 곳: 카드 아래 왼쪽 세로선에 붙은 작은 목록 (번호 없음)
+ *   동그라미 = 다녀옴 체크 · 이름 = 지도에서 그 점으로 · ↗ = 구글맵에서 보기
+ */
+function SpotList(props: {
+  parent: Plan
+  spots: SubSpot[]
+  activeId: string | null
+  onToggle: (p: Plan, spotId: string) => void
+  onFocus: (p: Plan, s: SubSpot) => void
+}) {
+  const { parent, spots, activeId } = props
+  return (
+    <ul className="ml-3 mt-1.5 border-l-2 border-neutral-200 pl-1">
+      {spots.map((s) => {
+        const url = googleSpotUrl(s)
+        const meta = [kindLabel(s.kind), s.memo].filter(Boolean).join(' · ')
+        const on = activeId === `${parent.id}:${s.id}`
+        return (
+          <li key={s.id} className="flex items-center">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={s.done}
+              aria-label={`${s.title} 다녀옴`}
+              onClick={() => props.onToggle(parent, s.id)}
+              className="flex h-11 w-10 shrink-0 items-center justify-center"
+            >
+              <CheckCircleIcon checked={s.done} />
+            </button>
+            <button type="button" onClick={() => props.onFocus(parent, s)} className="min-w-0 flex-1 py-1.5 text-left">
+              <span className={`block truncate text-[14px] font-semibold ${s.done ? 'text-neutral-400 line-through' : on ? 'text-[#1F6FD6]' : 'text-neutral-800'}`}>
+                {s.title}
+              </span>
+              {meta && <span className="block truncate text-[12px] text-neutral-400">{meta}</span>}
+            </button>
+            {url && (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${s.title} 구글맵에서 보기`}
+                className="flex h-11 w-10 shrink-0 items-center justify-center text-neutral-400 active:text-neutral-600"
+              >
+                <ExternalIcon />
+              </a>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
 }
 
 /**

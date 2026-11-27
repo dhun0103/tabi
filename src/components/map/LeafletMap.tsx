@@ -1,14 +1,16 @@
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useRef } from 'react'
-import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
+import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapFocus, type MapPin, type MapProps } from './mapTypes'
 
 /* 구글 키가 없을 때 쓰는 무료 지도: 일본 국토지리원 "연한 지도"(淡色地図). 출처 표시 필수, 일본 전용 */
 const TILE_URL = 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png'
 const ATTRIBUTION = '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'
 
-const icon = (p: MapPin, active: boolean) =>
-  L.divIcon({ className: 'tn-pin-wrap', html: pinElement(p, active).outerHTML, iconSize: [28, 28], iconAnchor: [14, 14] })
+const icon = (p: MapPin, active: boolean) => {
+  const s = p.small ? 14 : 28 // 들를 곳은 작은 점 (index.css .tn-pin-sm 과 같은 크기)
+  return L.divIcon({ className: 'tn-pin-wrap', html: pinElement(p, active).outerHTML, iconSize: [s, s], iconAnchor: [s / 2, s / 2] })
+}
 
 export function LeafletMap(props: MapProps) {
   const el = useRef<HTMLDivElement>(null)
@@ -16,6 +18,7 @@ export function LeafletMap(props: MapProps) {
   const layerRef = useRef<L.LayerGroup | null>(null)
   const markersRef = useRef(new Map<string, { marker: L.Marker; pin: MapPin }>())
   const viewSet = useRef(false) // keepView: 화면을 한 번 맞췄나
+  const appliedFocus = useRef<number | null>(null) // 마지막으로 맞춘 focus.key
   const latest = useRef(props)
   useEffect(() => {
     latest.current = props
@@ -92,6 +95,12 @@ export function LeafletMap(props: MapProps) {
     map.setView([pin.lat, pin.lng], Math.max(map.getZoom(), FOCUS_ZOOM), { animate: true })
   }
 
+  /** 들를 곳: 점들이 다 보이게 (점 하나면 그 점을 가운데에 f.zoom 으로) */
+  function fitPoints(map: L.Map, f: MapFocus) {
+    if (f.points.length === 1) map.setView([f.points[0].lat, f.points[0].lng], f.zoom, { animate: true })
+    else map.fitBounds(L.latLngBounds(f.points.map((p) => [p.lat, p.lng] as L.LatLngTuple)), { padding: [40, 40], maxZoom: f.zoom })
+  }
+
   // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
   const { activeId } = props
   const prevActive = useRef<string | null | undefined>(null)
@@ -107,6 +116,17 @@ export function LeafletMap(props: MapProps) {
     else if (!activeId && prevActive.current) fitAll(map)
     prevActive.current = activeId
   }, [activeId])
+
+  // 들를 곳을 펼치거나 누르면 그 동네·점으로
+  // 무료 지도는 그리기·고른 장소 이동이 모두 바로(같은 순간에) 끝나서, 맨 마지막 이 effect가 화면을 정함
+  const focusKey = props.focus?.key
+  useEffect(() => {
+    const map = mapRef.current
+    const f = latest.current.focus
+    if (!map || !f || !f.points.length || f.key === appliedFocus.current) return
+    appliedFocus.current = f.key
+    fitPoints(map, f)
+  }, [focusKey])
 
   // isolate: 지도 안쪽 z-index가 위의 헤더·탭바를 덮지 않게
   return <div ref={el} className={`isolate ${props.className ?? ''}`} />

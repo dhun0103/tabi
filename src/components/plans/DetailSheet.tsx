@@ -7,7 +7,7 @@ import { categoryOf, expenseKRW, fmtKRW, fmtMoney, kindLabel, newId } from '../.
 import { repo } from '../../store'
 import type { Expense, Photo, Plan } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
-import { CategoryIcon, MemoIcon } from '../icons'
+import { CategoryIcon, CheckCircleIcon, MemoIcon, PinIcon, XIcon } from '../icons'
 import { TimeDialog } from '../TimePicker'
 import { MINT_INK, MINT_SOFT, Sheet, btnPrimary, inputCls, reportError } from '../ui'
 
@@ -22,17 +22,37 @@ interface Props {
   onAddExpense: () => void
   onOpenExpense: (e: Expense, mine: boolean) => void
   onEdit: () => void
+  /** 들를 곳 (이 장소 안에서 둘러볼 가게들): 추가 · 다녀옴 체크 · 빼기 */
+  onAddSpot: () => void
+  onToggleSpot: (spotId: string) => void
+  onRemoveSpot: (spotId: string) => void
   onClose: () => void
 }
 
 /**
  * 장소를 누르면 아래에서 올라오는 작은 카드 (NOL 일정 화면처럼)
  *   이름 · 종류·동네
- *   🕒 시간 (누르면 24시간 시간 창) · ≡ 메모 (누르면 바로 쓰기) · 📷 사진 · 이 장소에서 쓴 돈
+ *   🕒 시간 (누르면 24시간 시간 창) · ≡ 메모 (누르면 바로 쓰기) · 📍 들를 곳 · 📷 사진 · 이 장소에서 쓴 돈
  *   [지출 추가]  ·  일정 수정·삭제
  * 상세 보기(평점·영업시간 등)는 없음 → 구글 장소 상세 요청도 하지 않음
  */
-export function DetailSheet({ tripId, plan, expenses, mine, rate, suggestTime, onUpdate, onAddExpense, onOpenExpense, onEdit, onClose }: Props) {
+export function DetailSheet({
+  tripId,
+  plan,
+  expenses,
+  mine,
+  rate,
+  suggestTime,
+  onUpdate,
+  onAddExpense,
+  onOpenExpense,
+  onEdit,
+  onAddSpot,
+  onToggleSpot,
+  onRemoveSpot,
+  onClose,
+}: Props) {
+  const spots = plan.spots ?? []
   const [timeOpen, setTimeOpen] = useState(false)
   const [memoOpen, setMemoOpen] = useState(false)
   const [memoText, setMemoText] = useState('')
@@ -117,6 +137,55 @@ export function DetailSheet({ tripId, plan, expenses, mine, rate, suggestTime, o
           >
             {plan.memo ? <span className="whitespace-pre-wrap text-neutral-700">{plan.memo}</span> : <span className="text-neutral-400">메모 추가</span>}
           </Row>
+        )}
+
+        {/* 들를 곳: 없으면 "들를 곳 추가" 한 줄, 있으면 목록(다녀옴 체크 · 빼기) + 추가 */}
+        {spots.length === 0 ? (
+          <Row icon={<PinIcon className={iconCls} />} label="들를 곳" onClick={onAddSpot}>
+            <span className="text-neutral-400">들를 곳 추가</span>
+          </Row>
+        ) : (
+          <div className="py-2.5">
+            <div className="flex items-center gap-3 text-[15px]">
+              <span className="text-neutral-500">
+                <PinIcon className={iconCls} />
+              </span>
+              <span className="flex-1 text-neutral-700">들를 곳 {spots.length}</span>
+            </div>
+            <ul className="ml-8 mt-2 divide-y divide-black/[0.05] rounded-xl bg-[#F5F6F8]">
+              {spots.map((s) => (
+                <li key={s.id} className="flex items-center">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={s.done}
+                    aria-label={`${s.title} 다녀옴`}
+                    onClick={() => onToggleSpot(s.id)}
+                    className="flex h-11 w-10 shrink-0 items-center justify-center"
+                  >
+                    <CheckCircleIcon checked={s.done} />
+                  </button>
+                  <span className="min-w-0 flex-1 py-2">
+                    <span className={`block truncate text-[14px] font-medium ${s.done ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>{s.title}</span>
+                    {(s.kind || s.memo) && (
+                      <span className="block truncate text-[12px] text-neutral-400">{[kindLabel(s.kind), s.memo].filter(Boolean).join(' · ')}</span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveSpot(s.id)}
+                    aria-label={`${s.title} 들를 곳에서 빼기`}
+                    className="flex h-11 w-10 shrink-0 items-center justify-center text-neutral-400 active:text-neutral-600"
+                  >
+                    <XIcon />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={onAddSpot} className="ml-8 mt-2 px-1 py-1 text-[14px] font-semibold text-[#2F87F2] active:opacity-70">
+              + 들를 곳 추가
+            </button>
+          </div>
         )}
 
         <PlacePhotos tripId={tripId} planId={plan.id} />

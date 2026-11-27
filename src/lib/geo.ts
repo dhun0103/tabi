@@ -1,4 +1,4 @@
-import type { Plan } from '../types'
+import type { Plan, SubSpot } from '../types'
 import { categoryFromKind } from './util'
 
 /* ───────── 장소 번호 색 (지도 핀·타임라인 번호) ─────────
@@ -123,6 +123,14 @@ export function googlePlaceUrl(p: Plan): string | null {
   }
   if (p.mapUrl && isUrl(p.mapUrl)) return p.mapUrl
   const q = p.place || (hasCoords(p) ? `${p.lat},${p.lng}` : '')
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null
+}
+
+/** 들를 곳 보기 (구글 장소 ID가 있으면 정확히 그 장소, 없으면 이름/좌표로) */
+export function googleSpotUrl(s: Pick<SubSpot, 'title' | 'place' | 'placeId' | 'lat' | 'lng'>): string | null {
+  const name = s.place || s.title
+  if (s.placeId) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}&query_place_id=${encodeURIComponent(s.placeId)}`
+  const q = name || (s.lat !== null && s.lng !== null ? `${s.lat},${s.lng}` : '')
   return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : null
 }
 

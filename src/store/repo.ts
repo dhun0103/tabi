@@ -46,4 +46,6 @@ export interface TripRepo {
   deletePhoto(tripId: string, id: string): Promise<void>
   /** 장소를 지울 때 그 장소 사진도 같이 */
   deletePhotosOf(tripId: string, planId: string): Promise<void>
+  /** 장소 사진을 다른 장소로 (일정에 있던 장소를 다른 장소의 "들를 곳"으로 옮길 때 사진은 큰 장소에 붙임) */
+  movePhotos(tripId: string, fromPlanId: string, toPlanId: string): Promise<void>
 }

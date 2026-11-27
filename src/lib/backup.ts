@@ -1,4 +1,4 @@
-import type { Expense, Flight, Plan, PlanType, Trip } from '../types'
+import type { Expense, Flight, Plan, PlanType, SubSpot, Trip } from '../types'
 import { CATEGORIES } from './util'
 
 /**
@@ -27,6 +27,24 @@ function normalizeFlight(x: unknown): Flight {
   return { from: str(f.from), to: str(f.to), arrive: str(f.arrive), airline: str(f.airline), number: str(f.number) }
 }
 
+function normalizeSpot(x: unknown): SubSpot | null {
+  const o = (x ?? {}) as Obj
+  if (!okId(o.id)) return null
+  const lat = coord(o.lat)
+  const lng = coord(o.lng)
+  return {
+    id: o.id,
+    title: str(o.title) || '(이름 없음)',
+    place: str(o.place),
+    placeId: str(o.placeId),
+    lat: lat !== null && lng !== null ? lat : null,
+    lng: lat !== null && lng !== null ? lng : null,
+    kind: str(o.kind),
+    memo: str(o.memo),
+    done: o.done === true,
+  }
+}
+
 export function normalizePlan(x: unknown): Plan | null {
   const o = (x ?? {}) as Obj
   if (!okId(o.id)) return null
@@ -35,11 +53,14 @@ export function normalizePlan(x: unknown): Plan | null {
   const lng = coord(o.lng)
   const createdAt = num(o.createdAt, now)
   const type: PlanType = o.type === 'memo' || o.type === 'flight' ? o.type : 'place'
+  const spots = type === 'place' && Array.isArray(o.spots) ? o.spots.map(normalizeSpot).filter((s): s is SubSpot => s !== null) : []
   return {
     id: o.id,
     type,
     // 항공편만 flight 칸을 가짐 (다른 종류엔 칸을 아예 안 만듦: Firestore가 undefined를 못 받음)
     ...(type === 'flight' ? { flight: normalizeFlight(o.flight) } : {}),
+    // 들를 곳도 있는 장소만 (없으면 칸 없음)
+    ...(spots.length ? { spots } : {}),
     date: str(o.date),
     time: str(o.time),
     order: num(o.order, createdAt), // 예전 데이터: 만든 순서대로

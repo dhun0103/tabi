@@ -131,5 +131,10 @@ export function createCloudRepo(config: FirebaseOptions): TripRepo {
       const snap = await getDocs(query(collection(db, 'trips', tripId, 'photos'), where('planId', '==', planId)))
       await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)))
     },
+
+    async movePhotos(tripId, fromPlanId, toPlanId) {
+      const snap = await getDocs(query(collection(db, 'trips', tripId, 'photos'), where('planId', '==', fromPlanId)))
+      await Promise.all(snap.docs.map((d) => updateDoc(d.ref, { planId: toPlanId })))
+    },
   }
 }

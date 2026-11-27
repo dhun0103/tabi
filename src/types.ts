@@ -40,8 +40,26 @@ export interface Plan {
   kind: string // 관광명소, 음식점, 카페 …
   area: string // 나카구, 나고야시
   flight?: Flight // type이 flight일 때만 (다른 종류엔 이 칸 자체가 없음: Firestore는 undefined 값을 못 받음)
+  spots?: SubSpot[] // 장소 안에서 들를 곳 (type이 place이고 들를 곳이 있을 때만)
   createdAt: number
   updatedAt: number
+}
+
+/**
+ * 장소 안에서 들를 곳 (오스 상점가 안의 가게들)
+ *   일정 흐름(번호·동선·거리)엔 안 나오고, 장소 카드의 "들를 곳 N"을 누르면 그 자리에서 펼쳐짐
+ *   시간·지출·사진은 따로 없음 (큰 장소에 붙임)
+ */
+export interface SubSpot {
+  id: string
+  title: string
+  place: string // 구글맵 검색어 (현지어 이름)
+  placeId: string
+  lat: number | null
+  lng: number | null
+  kind: string
+  memo: string // 일정에서 가져온 장소에 있던 메모 (없으면 '')
+  done: boolean // 다녀옴
 }
 
 export interface Expense {

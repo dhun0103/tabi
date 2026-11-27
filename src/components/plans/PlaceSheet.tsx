@@ -4,7 +4,7 @@ import { googleResolve, googleSuggest, newSearchSession, useGoogleEnabled, type 
 import { orderForInsert } from '../../lib/order'
 import { categoryFromKind, changedFields, dayText, kindLabel, newId, suggestTime } from '../../lib/util'
 import { repo } from '../../store'
-import type { Plan, Trip } from '../../types'
+import type { Plan, SubSpot, Trip } from '../../types'
 import { askConfirm } from '../ConfirmDialog'
 import { MapView } from '../map/MapView'
 import { TimePicker } from '../TimePicker'
@@ -24,6 +24,9 @@ interface Props {
   allPlans: Plan[]
   initial: Plan | null
   defaultDate: string
+  /** 들를 곳 모드: 이 장소 안에 들를 곳을 추가 (시간 칸 없음, 저장하면 onAddSpot) */
+  spotOf?: Plan | null
+  onAddSpot?: (spot: SubSpot, from: Plan | null) => void
   onClose: () => void
 }
 
@@ -32,6 +35,25 @@ interface SavedSpot {
   result: PlaceResult
   where: string // "Day 1, Day 4" / "가고 싶은 곳"
   search: string // 검색어 비교용 (이름 + 현지어 이름, 소문자)
+  from?: Plan // 들를 곳 모드: 이 일정을 들를 곳으로 옮겨 옴
+}
+
+/**
+ * 들를 곳 모드에서 "일정에서 가져오기": 같은 날 장소 → 가고 싶은 곳 (지도 위치가 있는 장소만, 큰 장소 자신은 빼고)
+ * 고르면 그 일정은 일정에서 빠지고 큰 장소의 들를 곳으로 들어감
+ */
+function takeCandidates(plans: Plan[], days: string[], parent: Plan): SavedSpot[] {
+  const undated = (p: Plan) => !days.includes(p.date)
+  return plans
+    .filter((p) => p.type === 'place' && p.id !== parent.id && (p.date === parent.date || undated(p)))
+    .filter(hasCoords)
+    .sort((a, b) => Number(undated(a)) - Number(undated(b)) || a.order - b.order)
+    .map((p) => ({
+      result: { key: p.id, name: p.title, localName: p.place, lat: p.lat, lng: p.lng, kind: p.kind, area: p.area, placeId: p.placeId },
+      where: undated(p) ? '가고 싶은 곳' : `Day ${days.indexOf(p.date) + 1}`,
+      search: `${p.title} ${p.place}`.toLowerCase(),
+      from: p,
+    }))
 }
 
 const SAVED_PREVIEW = 5 // 처음엔 이만큼만, 나머지는 [더 보기]
@@ -73,7 +95,7 @@ function savedSpots(plans: Plan[], days: string[]): SavedSpot[] {
  *         이 여행에 이미 넣은 장소는 검색 없이 목록에서 바로 고르기 (같은 장소를 이 날에도 하나 더 넣음, 원래 것은 그대로)
  *   수정: 이름·시간·메모만. 장소와 날짜는 그대로 (바꾸려면 삭제하고 그 날에서 새로 추가)
  */
-export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultDate, onClose }: Props) {
+export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultDate, spotOf = null, onAddSpot, onClose }: Props) {
   // 창을 열 때의 값으로 고정: 저장할 때 "내가 바꾼 칸"을 이 값과 비교해서 고른다
   // (그사이 일행이 고친 값과 비교하면, 내가 안 건드린 칸까지 옛 값으로 덮어쓰게 됨)
   const [initial] = useState(openedWith)
@@ -113,8 +135,11 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
   useEffect(() => () => abortRef.current?.abort(), [])
 
   // 이 여행에 이미 넣은 장소: 검색칸이 비어 있으면 목록으로, 입력하면 이름이 맞는 곳을 검색 결과 위에
-  const saved = useMemo(() => savedSpots(allPlans, days), [allPlans, days])
+  // (들를 곳 모드에선 "일정에서 가져오기": 같은 날 장소·가고 싶은 곳을 옮겨 옴)
+  const saved = useMemo(() => (spotOf ? takeCandidates(allPlans, days, spotOf) : savedSpots(allPlans, days)), [allPlans, days, spotOf])
+  const savedLabel = spotOf ? '일정에서 가져오기 · 일정에서는 빠져요' : '이 여행에 넣은 장소'
   const [showAllSaved, setShowAllSaved] = useState(false)
+  const [pickedFrom, setPickedFrom] = useState<Plan | null>(null) // 들를 곳 모드: 일정에서 가져온 장소
   const q = query.trim().toLowerCase()
   const savedHits = q ? saved.filter((s) => s.search.includes(q)).slice(0, 3) : []
 
@@ -167,7 +192,8 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
     }
   }
 
-  const choose = (r: PlaceResult) => {
+  /** from: 들를 곳 모드에서 "일정에서 가져오기"로 고른 일정 (검색에서 고르면 null) */
+  const choose = (r: PlaceResult, from: Plan | null = null) => {
     setSpot({ lat: r.lat, lng: r.lng, name: r.name, localName: r.localName, kind: r.kind, area: r.area, placeId: r.placeId ?? '' })
     setPlaceText(r.localName)
     setResults(null)
@@ -178,6 +204,8 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
       setTitle(r.name)
       autoName.current = r.name
     }
+    setPickedFrom(from)
+    if (from?.memo && !memo.trim()) setMemo(from.memo) // 가져온 장소의 메모도 같이
     setError('')
   }
 
@@ -199,7 +227,7 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
     <li key={s.result.key}>
       <button
         type="button"
-        onClick={() => choose(s.result)}
+        onClick={() => choose(s.result, s.from ?? null)}
         disabled={busy}
         className="flex w-full items-center gap-3 px-3.5 py-3 text-left active:bg-neutral-50 disabled:opacity-50"
       >
@@ -232,6 +260,25 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
     const name = title.trim() || spot?.name || query.trim()
     if (!name) {
       setError('장소를 검색하거나 이름을 적어 주세요')
+      return
+    }
+    if (spotOf) {
+      // 들를 곳 모드: 큰 장소의 들를 곳 목록에 추가 (일정에서 가져온 거면 그 일정은 PlansTab에서 옮김 처리)
+      onAddSpot?.(
+        {
+          id: newId(),
+          title: name,
+          place: spot ? spot.localName : query.trim() || placeText,
+          placeId: spot?.placeId ?? '',
+          lat: spot?.lat ?? null,
+          lng: spot?.lng ?? null,
+          kind: spot?.kind ?? '',
+          memo: memo.trim(),
+          done: pickedFrom?.done ?? false,
+        },
+        pickedFrom,
+      )
+      onClose()
       return
     }
     const now = Date.now()
@@ -278,9 +325,9 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
 
   return (
     <Sheet
-      title={initial ? '장소 수정' : '장소 추가'}
-      // 날짜 칸이 없으니 어느 날인지 제목 아래에 표시
-      subtitle={<p className="text-[13px] text-neutral-500">{dayText(days, date)}</p>}
+      title={initial ? '장소 수정' : spotOf ? '들를 곳 추가' : '장소 추가'}
+      // 날짜 칸이 없으니 어느 날인지 제목 아래에 표시 (들를 곳 모드는 어느 장소 안인지)
+      subtitle={<p className="truncate text-[13px] text-neutral-500">{spotOf ? `${spotOf.title} 안에서 둘러볼 곳` : dayText(days, date)}</p>}
       onClose={onClose}
       footer={
         <div className="flex gap-2">
@@ -321,6 +368,7 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
               onClick={() => {
                 setSpot(null)
                 setPlaceText('')
+                setPickedFrom(null)
               }}
               className="shrink-0 text-sm font-medium text-neutral-500"
             >
@@ -356,7 +404,7 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
             {/* 검색칸이 비어 있을 때: 이 여행에 넣은 장소 목록 (숙소 → 가고 싶은 곳 → Day 순) */}
             {!q && saved.length > 0 && (
               <div className="mt-3">
-                <p className="mb-1.5 text-[12px] font-medium text-neutral-400">이 여행에 넣은 장소</p>
+                <p className="mb-1.5 text-[12px] font-medium text-neutral-400">{savedLabel}</p>
                 <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">
                   {(showAllSaved ? saved : saved.slice(0, SAVED_PREVIEW)).map(savedRow)}
                 </ul>
@@ -378,7 +426,7 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
             {/* 입력 중: 이 여행에 넣은 장소 중 이름이 맞는 곳을 검색 결과 위에 (검색 비용 없이 바로) */}
             {savedHits.length > 0 && (
               <>
-                <p className="mb-1.5 mt-3 text-[12px] font-medium text-neutral-400">이 여행에 넣은 장소</p>
+                <p className="mb-1.5 mt-3 text-[12px] font-medium text-neutral-400">{savedLabel}</p>
                 <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200">{savedHits.map(savedRow)}</ul>
               </>
             )}
@@ -464,7 +512,8 @@ export function PlaceSheet({ trip, days, allPlans, initial: openedWith, defaultD
       </Field>
       {error && <p className="-mt-3 text-sm text-red-600">{error}</p>}
 
-      <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date, initial?.id)} />
+      {/* 들를 곳엔 시간이 없음 (큰 장소의 시간을 따름) */}
+      {!spotOf && <TimePicker value={time} onChange={setTime} suggest={suggestTime(allPlans, date, initial?.id)} />}
 
       <Field label="메모 (선택)">
         <textarea value={memo} onChange={(e) => setMemo(e.target.value)} rows={3} placeholder="예약번호, 꼭 먹을 메뉴…" className={inputCls} />

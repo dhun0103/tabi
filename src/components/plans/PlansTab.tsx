@@ -4,10 +4,11 @@ import { ROUTE_COLOR, centerOf, googleRouteUrl, hasCoords, placeColor, type LatL
 import { byOrder, optimizeRoute, orderAfterMove, orderForInsert, reindex, sortByTime } from '../../lib/order'
 import { categoryFromKind, expenseKRW, fmtDay, fmtJPY, fmtKRW, suggestTime, todayStr, tripDays } from '../../lib/util'
 import { repo } from '../../store'
-import type { Expense, Plan, Trip } from '../../types'
-import { showAlert } from '../ConfirmDialog'
+import type { Expense, Plan, SubSpot, Trip } from '../../types'
+import { askConfirm, showAlert } from '../ConfirmDialog'
 import { ExpenseSheet } from '../expenses/ExpenseSheet'
 import { MapView, type MapPin, type MapRoute } from '../map/MapView'
+import type { MapFocus } from '../map/mapTypes'
 import { BLUE, Empty, btnGhost, cardCls, reportError } from '../ui'
 import { DetailSheet } from './DetailSheet'
 import { FlightSheet } from './FlightSheet'
@@ -19,6 +20,7 @@ const UNDATED = '' // 날짜 미정 = 가고 싶은 곳 모음
 
 type SheetState =
   | { kind: 'detail'; plan: Plan }
+  | { kind: 'spot'; plan: Plan } // 이 장소에 들를 곳 추가
   | { kind: 'place'; plan: Plan | null }
   | { kind: 'memo'; plan: Plan | null }
   | { kind: 'flight'; plan: Plan | null }
@@ -36,7 +38,9 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
   const view = picked === UNDATED || days.includes(picked) ? picked : (days[0] ?? UNDATED)
   const [editing, setEditing] = useState(false)
   const [sheet, setSheet] = useState<SheetState>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null) // 장소 id, 들를 곳이면 "장소id:들를곳id"
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set()) // 들를 곳을 펼친 장소
+  const [focus, setFocus] = useState<MapFocus | null>(null) // 들를 곳을 펼치거나 누를 때 지도를 그 동네로
   const [toast, setToast] = useState('')
 
   const isUndated = (p: Plan) => !p.date || !days.includes(p.date)
@@ -172,6 +176,14 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
     places.forEach((p, i) => {
       const c = placeColor(p.kind)
       if (hasCoords(p)) pins.push({ id: p.id, lat: p.lat, lng: p.lng, label: String(i + 1), title: p.title, color: c.bg, ink: c.ink })
+      // 들를 곳을 펼친 장소: 그 가게들을 숫자 없는 작은 점으로 (동선 점선엔 안 넣음)
+      if (!editing && expanded.has(p.id)) {
+        for (const s of p.spots ?? []) {
+          if (s.lat === null || s.lng === null) continue
+          const sc = placeColor(s.kind)
+          pins.push({ id: `${p.id}:${s.id}`, lat: s.lat, lng: s.lng, label: '', title: s.title, color: sc.bg, ink: sc.ink, small: true })
+        }
+      }
     })
     if (view !== UNDATED) routes.push({ color: ROUTE_COLOR, points: places.filter(hasCoords).map((p) => ({ lat: p.lat, lng: p.lng })) })
   }
@@ -225,13 +237,68 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
   }
 
   // 지도 핀을 누르면: 그 장소를 고르고, 목록에서 그 장소를 지도 바로 아래(기준선)로 올림
-  const focusOnList = (id: string) => {
-    setActiveId(id)
-    const el = document.getElementById(`plan-${id}`)
+  // (들를 곳 점 "장소id:들를곳id"를 누르면 그 점을 고르고, 목록은 그 장소로)
+  const focusOnList = (pinId: string) => {
+    setActiveId(pinId)
+    const el = document.getElementById(`plan-${pinId.split(':')[0]}`)
     if (!el) return
     const line = stickyRef.current?.getBoundingClientRect().bottom ?? 0
     lockUntil.current = Date.now() + 1000 // 목록이 움직이는 동안 지나가는 장소로 바뀌지 않게
     window.scrollTo({ top: Math.max(0, window.scrollY + el.getBoundingClientRect().top - line - 8), behavior: 'smooth' })
+  }
+
+  /* ───── 들를 곳 (장소 안에서 둘러볼 가게들: 그 장소 칸에 목록으로 저장) ───── */
+  const latestOf = (p: Plan) => plans.find((x) => x.id === p.id) ?? p // 일행이 그사이 고쳤을 수도 있으니 최신 것으로
+  const setSpots = (p: Plan, spots: SubSpot[]) => patch(p.id, { spots })
+  const spotPoints = (p: Plan): LatLng[] => [
+    ...(hasCoords(p) ? [{ lat: p.lat, lng: p.lng }] : []),
+    ...(p.spots ?? []).flatMap((s) => (s.lat !== null && s.lng !== null ? [{ lat: s.lat, lng: s.lng }] : [])),
+  ]
+  // "들를 곳 N" 알약: 펼치면 카드 아래 목록 + 지도에 작은 점(그 동네가 보이게 확대), 접으면 그 장소로 조금 물러남
+  const toggleExpand = (p: Plan) => {
+    const open = !expanded.has(p.id)
+    setExpanded((cur) => {
+      const next = new Set(cur)
+      if (open) next.add(p.id)
+      else next.delete(p.id)
+      return next
+    })
+    setActiveId(p.id)
+    lockUntil.current = Date.now() + 600 // 목록 높이가 바뀌는 동안 스크롤 따라 다른 장소로 안 넘어가게
+    const points = open ? spotPoints(p) : spotPoints({ ...p, spots: [] })
+    if (points.length) setFocus({ key: Date.now(), points, zoom: open ? 17 : 14 })
+  }
+  const toggleSpot = (p: Plan, spotId: string) => {
+    const cur = latestOf(p)
+    setSpots(cur, (cur.spots ?? []).map((s) => (s.id === spotId ? { ...s, done: !s.done } : s)))
+  }
+  const focusSpot = (p: Plan, s: SubSpot) => {
+    if (s.lat === null || s.lng === null) return
+    setActiveId(`${p.id}:${s.id}`)
+    setFocus({ key: Date.now(), points: [{ lat: s.lat, lng: s.lng }], zoom: 17 })
+  }
+  const removeSpot = async (p: Plan, spotId: string) => {
+    const s = latestOf(p).spots?.find((x) => x.id === spotId)
+    if (!s || !(await askConfirm({ title: `"${s.title}"을 들를 곳에서 뺄까요?`, confirmLabel: '빼기', danger: true }))) return
+    const cur = latestOf(p)
+    setSpots(cur, (cur.spots ?? []).filter((x) => x.id !== spotId))
+  }
+  /**
+   * 들를 곳 추가. from: 일정에 있던 장소를 가져온 거면 그 장소
+   *   → 그 장소의 지출·사진은 이 장소에 붙이고(사진을 옮긴 뒤에) 일정에서는 뺌
+   */
+  const addSpot = (p: Plan, spot: SubSpot, from: Plan | null) => {
+    const cur = latestOf(p)
+    setSpots(cur, [...(cur.spots ?? []), spot])
+    setExpanded((s) => new Set(s).add(p.id))
+    if (!from) return
+    const now = Date.now()
+    for (const e of expenses.filter((x) => x.planId === from.id)) repo.patchItem(trip.id, 'expenses', e.id, { planId: p.id, updatedAt: now }).catch(reportError)
+    for (const e of mine.filter((x) => x.planId === from.id)) repo.patchMine(trip.id, e.id, { planId: p.id, updatedAt: now }).catch(reportError)
+    repo
+      .movePhotos(trip.id, from.id, p.id)
+      .then(() => repo.deleteItem(trip.id, 'plans', from.id))
+      .catch(reportError)
   }
   const openItem = (p: Plan) =>
     setSheet(p.type === 'memo' ? { kind: 'memo', plan: p } : p.type === 'flight' ? { kind: 'flight', plan: p } : { kind: 'detail', plan: p })
@@ -264,6 +331,7 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
             routes={routes}
             activeId={activeId}
             fallbackCenter={centerOf(near)}
+            focus={focus}
             onPinClick={focusOnList}
           />
         </div>
@@ -348,6 +416,10 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
             editing={editing}
             onOpen={openItem}
             onFocus={(p) => setActiveId(p.id)}
+            expanded={expanded}
+            onToggleExpand={toggleExpand}
+            onToggleSpot={toggleSpot}
+            onFocusSpot={focusSpot}
             onReorder={reorder}
             edges={listEdges}
             onDragChange={(d) => {
@@ -395,11 +467,27 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
           onAddExpense={() => setSheet({ kind: 'expense', plan: sheetPlan, expense: null })}
           onOpenExpense={(e, isMine) => setSheet({ kind: 'expense', plan: sheetPlan, expense: e, mine: isMine })}
           onEdit={() => setSheet({ kind: 'place', plan: sheetPlan })}
+          onAddSpot={() => setSheet({ kind: 'spot', plan: sheetPlan })}
+          onToggleSpot={(spotId) => toggleSpot(sheetPlan, spotId)}
+          onRemoveSpot={(spotId) => void removeSpot(sheetPlan, spotId)}
           onClose={() => setSheet(null)}
         />
       )}
       {sheet?.kind === 'place' && (
         <PlaceSheet trip={trip} days={days} allPlans={plans} initial={sheetPlan} defaultDate={view} onClose={() => setSheet(null)} />
+      )}
+      {sheet?.kind === 'spot' && sheetPlan && (
+        // 들를 곳 추가: 장소 추가 창을 "들를 곳" 모드로 (검색 · 이 날 일정에서 가져오기 · 지도에서 찍기)
+        <PlaceSheet
+          trip={trip}
+          days={days}
+          allPlans={plans}
+          initial={null}
+          defaultDate={sheetPlan.date}
+          spotOf={sheetPlan}
+          onAddSpot={(s, from) => addSpot(sheetPlan, s, from)}
+          onClose={() => setSheet({ kind: 'detail', plan: sheetPlan })}
+        />
       )}
       {sheet?.kind === 'expense' && sheetPlan && (
         <ExpenseSheet

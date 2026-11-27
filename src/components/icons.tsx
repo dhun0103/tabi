@@ -101,6 +101,48 @@ export function MemoIcon({ className = 'h-5 w-5' }: { className?: string }) {
   )
 }
 
+/** 들를 곳 다녀옴 체크: 안 갔으면 빈 동그라미, 다녀왔으면 파란 동그라미 + 흰 체크 */
+export function CheckCircleIcon({ checked, className = 'h-5 w-5' }: { checked: boolean; className?: string }) {
+  return checked ? (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" fill="#2F87F2" />
+      <path d="M7.8 12.3l2.8 2.8 5.6-5.8" fill="none" stroke="#ffffff" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="#B4B8BF" strokeWidth={1.8} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  )
+}
+
+/** 들를 곳 (장소 카드의 줄 아이콘): 지도 핀 */
+export function PinIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </svg>
+  )
+}
+
+/** 구글맵에서 열기 (바깥으로 나가는 화살표) */
+export function ExternalIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 5h5v5M19 5l-8 8M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18V7.5A1.5 1.5 0 0 1 5.5 6H10" />
+    </svg>
+  )
+}
+
+/** 빼기 (작은 X) */
+export function XIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <path d="M7 7l10 10M17 7L7 17" />
+    </svg>
+  )
+}
+
 /** 항공편 (일정 타임라인의 파란 원 안 비행기). Material Icons "flight" 모양 */
 export function PlaneIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (

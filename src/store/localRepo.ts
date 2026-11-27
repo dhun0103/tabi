@@ -205,5 +205,12 @@ export function createLocalRepo(): TripRepo {
       await Promise.all(list.map((p) => done(store.delete(p.key))))
       photosChanged()
     },
+
+    async movePhotos(tripId, fromPlanId, toPlanId) {
+      const list = await photosOf(tripId, fromPlanId)
+      const store = await photoStore('readwrite')
+      await Promise.all(list.map((p) => done(store.put({ ...p, planId: toPlanId }))))
+      photosChanged()
+    },
   }
 }

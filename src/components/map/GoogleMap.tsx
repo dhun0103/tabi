@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { GOOGLE_MAP_ID, gmaps } from '../../lib/google'
-import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapPin, type MapProps } from './mapTypes'
+import { FOCUS_ZOOM, JAPAN, drawKeyOf, pinElement, type MapFocus, type MapPin, type MapProps } from './mapTypes'
 
 interface MarkerEntry {
   marker: google.maps.marker.AdvancedMarkerElement
@@ -15,6 +15,8 @@ export function GoogleMap(props: MapProps) {
   const markersRef = useRef(new Map<string, MarkerEntry>())
   const linesRef = useRef<google.maps.Polyline[]>([])
   const viewSet = useRef(false) // keepView: 화면을 한 번 맞췄나
+  const appliedFocus = useRef<number | null>(null) // 마지막으로 맞춘 focus.key
+  const drawnKey = useRef('') // 지금 지도에 그려진 핀·동선 (focus를 그린 뒤에 맞추려고)
   const [ready, setReady] = useState(false)
   const latest = useRef(props)
   useEffect(() => {
@@ -103,6 +105,15 @@ export function GoogleMap(props: MapProps) {
         marker.addEventListener('gmp-click', () => latest.current.onPinClick?.(p.id))
         markersRef.current.set(p.id, { marker, pin: p, wrap })
       }
+      drawnKey.current = drawKey
+
+      // 들를 곳을 펼쳐서 다시 그린 거면: 그 동네가 보이게
+      const f = latest.current.focus
+      if (f && f.points.length && f.key !== appliedFocus.current) {
+        appliedFocus.current = f.key
+        fitPoints(map, f, event)
+        return
+      }
 
       if (latest.current.keepView && viewSet.current) return
       viewSet.current = true
@@ -144,6 +155,21 @@ export function GoogleMap(props: MapProps) {
     map.panTo(pin)
   }
 
+  /** 들를 곳: 점들이 다 보이게 (점 하나면 그 점을 가운데에 f.zoom 으로) */
+  function fitPoints(map: google.maps.Map, f: MapFocus, event: typeof google.maps.event) {
+    if (f.points.length === 1) {
+      map.setCenter(f.points[0])
+      map.setZoom(f.zoom)
+      return
+    }
+    const lats = f.points.map((p) => p.lat)
+    const lngs = f.points.map((p) => p.lng)
+    map.fitBounds({ north: Math.max(...lats), south: Math.min(...lats), east: Math.max(...lngs), west: Math.min(...lngs) }, 56)
+    event.addListenerOnce(map, 'idle', () => {
+      if ((map.getZoom() ?? 0) > f.zoom) map.setZoom(f.zoom)
+    })
+  }
+
   // 고른 장소가 바뀌면 그 핀을 크게 + 지도 이동. 고른 게 풀리면(목록 맨 위로) 하루 전체 보기로
   const { activeId } = props
   const prevActive = useRef<string | null | undefined>(null)
@@ -163,6 +189,19 @@ export function GoogleMap(props: MapProps) {
     }
     prevActive.current = activeId
   }, [activeId])
+
+  // 들를 곳을 누르면(핀은 그대로) 그 점으로. 핀을 다시 그리는 중이면 그리고 나서 위(그리기)에서 맞춤
+  const focusKey = props.focus?.key
+  useEffect(() => {
+    const map = mapRef.current
+    const f = latest.current.focus
+    if (!map || !f || !f.points.length || f.key === appliedFocus.current) return
+    if (drawnKey.current !== drawKeyOf(latest.current)) return
+    appliedFocus.current = f.key
+    gmaps('core')
+      .then(({ event }) => mapRef.current === map && fitPoints(map, f, event))
+      .catch(() => {})
+  }, [focusKey])
 
   return <div ref={el} className={props.className} />
 }

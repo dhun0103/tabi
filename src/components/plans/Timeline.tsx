@@ -1,8 +1,8 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import { useRef, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { areaLabel, distanceM, fmtDistance, googleLegUrl, googleSpotUrl, hasCoords, placeColor, travelHint } from '../../lib/geo'
 import { flightTitle, kindLabel } from '../../lib/util'
 import type { Plan, SubSpot } from '../../types'
-import { CheckCircleIcon, ExternalIcon, MemoIcon, PlaneIcon } from '../icons'
+import { CheckCircleIcon, ExternalIcon, MemoIcon, PencilIcon, PlaneIcon } from '../icons'
 import { BLUE } from '../ui'
 import { useDragSort } from './useDragSort'
 
@@ -18,6 +18,10 @@ interface Props {
   onToggleExpand: (p: Plan) => void
   onToggleSpot: (p: Plan, spotId: string) => void // 다녀옴 체크
   onFocusSpot: (p: Plan, s: SubSpot) => void // 지도에서 그 점으로
+  /** 편집 중 들를 곳을 그 장소 안에서 끌어서(또는 ↑↓ 키로) 순서 바꾸기: 새 순서(들를 곳 id 목록) */
+  onReorderSpots: (p: Plan, nextIds: string[]) => void
+  /** 편집 중 들를 곳 이름을 누르면 그 자리에서 이름만 고치기 */
+  onRenameSpot: (p: Plan, spotId: string, title: string) => void
   /** 편집 중 ≡ 손잡이를 끌어서(또는 손잡이에서 ↑↓ 키로) 순서를 바꿈: 새 순서(id 목록), 옮긴 항목 */
   onReorder: (nextIds: string[], movedId: string) => void
   /** 화면에서 목록이 보이는 위·아래 경계 (끌 때 그 근처에서 저절로 스크롤) */
@@ -78,6 +82,8 @@ export function Timeline({
   onToggleExpand,
   onToggleSpot,
   onFocusSpot,
+  onReorderSpots,
+  onRenameSpot,
   onReorder,
   edges,
   onDragChange,
@@ -173,8 +179,9 @@ export function Timeline({
     const meta = [kindLabel(p.kind), areaLabel(p)].filter(Boolean).join(' · ') || (pinned ? '' : '지도 위치 없음')
     const money = spent?.get(p.id)
     const active = p.id === activeId || !!activeId?.startsWith(`${p.id}:`) // 들를 곳을 골라도 그 장소 줄을 강조
-    // 들를 곳: 편집 중엔 숨김 (순서 끌기를 단순하게)
-    const spots = editing ? [] : (p.spots ?? [])
+    // 들를 곳: 평소엔 카드 안 알약으로 접었다 폈다, 편집 중엔 알약 없이 늘 펼쳐서 ≡ 로 그 안에서 순서 바꾸기
+    const allSpots = p.spots ?? []
+    const spots = editing ? [] : allSpots
     const open = spots.length > 0 && expanded.has(p.id)
     const content = (
       <>
@@ -255,6 +262,16 @@ export function Timeline({
             {handle(`${num}번 ${p.title} 순서 바꾸기`)}
           </div>
           {open && <SpotList parent={p} spots={spots} activeId={activeId} onToggle={onToggleSpot} onFocus={onFocusSpot} />}
+          {editing && allSpots.length > 0 && (
+            <SpotEditList
+              parent={p}
+              spots={allSpots}
+              onReorder={onReorderSpots}
+              onRename={onRenameSpot}
+              edges={edges}
+              onDragChange={onDragChange}
+            />
+          )}
         </div>
       </li>,
     )
@@ -322,6 +339,82 @@ function SpotList(props: {
  * 편집 중 카드 오른쪽 ≡ 손잡이: 잡고 위아래로 끌어서 순서 바꾸기 (NOL처럼)
  * touch-none: 손잡이에서 시작한 손가락은 화면 스크롤 대신 끌기로. 초점이 있으면 ↑↓ 키로 한 칸씩
  */
+/**
+ * 편집 중 들를 곳: 늘 펼쳐서 보여 주고, 오른쪽 ≡ 로 그 장소 안에서만 위아래로 끌어서 순서 바꾸기
+ * (큰 장소의 ≡ 를 끌면 들를 곳 목록째 같이 움직임)
+ * 이름(✎)을 누르면 그 자리에서 이름만 고치기: Enter·다른 곳 누르면 저장, Esc 는 취소, 비우면 그대로
+ */
+function SpotEditList(props: {
+  parent: Plan
+  spots: SubSpot[]
+  onReorder: (p: Plan, nextIds: string[]) => void
+  onRename: (p: Plan, spotId: string, title: string) => void
+  edges: () => { top: number; bottom: number }
+  onDragChange?: (dragging: boolean) => void
+}) {
+  const { parent, spots } = props
+  const drag = useDragSort(
+    spots.map((s) => s.id),
+    { onDrop: (nextIds) => props.onReorder(parent, nextIds), edges: props.edges, onDragChange: props.onDragChange },
+  )
+  const byId = new Map(spots.map((s) => [s.id, s]))
+  const list = drag.shown.flatMap((id) => byId.get(id) ?? [])
+
+  const [renaming, setRenaming] = useState<{ id: string; text: string } | null>(null)
+  const open = useRef<string | null>(null) // 고치는 중인 들를 곳 (Enter 뒤 blur 로 두 번 저장되지 않게)
+  const start = (s: SubSpot) => {
+    open.current = s.id
+    setRenaming({ id: s.id, text: s.title })
+  }
+  const finish = (save: boolean) => {
+    if (!renaming || open.current !== renaming.id) return
+    open.current = null
+    const s = byId.get(renaming.id)
+    const t = renaming.text.trim()
+    setRenaming(null)
+    if (save && s && t && t !== s.title) props.onRename(parent, s.id, t)
+  }
+
+  return (
+    <ul ref={drag.listRef} className="ml-3 mt-1.5 border-l-2 border-neutral-200 pl-1">
+      {list.map((s, idx) => (
+        // 바탕색: 끌어서 띄울 때 아래 줄 글자가 비치지 않게 (페이지 바탕과 같은 색)
+        <li key={s.id} className="flex items-center rounded-lg bg-[#f4f5f8]">
+          <span className="flex h-11 w-10 shrink-0 items-center justify-center" aria-hidden="true">
+            <CheckCircleIcon checked={s.done} />
+          </span>
+          {renaming?.id === s.id ? (
+            <input
+              value={renaming.text}
+              onChange={(e) => setRenaming({ id: s.id, text: e.target.value })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  finish(true)
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  finish(false)
+                }
+              }}
+              onBlur={() => finish(true)}
+              autoFocus
+              enterKeyHint="done"
+              aria-label="들를 곳 이름"
+              className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1.5 text-[14px] font-semibold text-neutral-900 outline-none ring-2 ring-[#2F87F2]"
+            />
+          ) : (
+            <button type="button" onClick={() => start(s)} aria-label={`${s.title} 이름 고치기`} className="flex min-w-0 flex-1 items-center gap-1.5 py-2 text-left">
+              <span className={`truncate text-[14px] font-semibold ${s.done ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>{s.title}</span>
+              <PencilIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+            </button>
+          )}
+          <DragHandle label={`들를 곳 ${s.title} 순서 바꾸기`} {...drag.handleProps(idx)} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function DragHandle({ label, ...rest }: { label: string } & Pick<HTMLAttributes<HTMLButtonElement>, 'onPointerDown' | 'onKeyDown'>) {
   return (
     <button

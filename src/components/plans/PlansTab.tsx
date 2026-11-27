@@ -277,6 +277,18 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
     setActiveId(`${p.id}:${s.id}`)
     setFocus({ key: Date.now(), points: [{ lat: s.lat, lng: s.lng }], zoom: 17 })
   }
+  // 편집에서 들를 곳 순서 바꾸기 (그사이 일행이 더한 들를 곳은 맨 뒤에 그대로)
+  const reorderSpots = (p: Plan, nextIds: string[]) => {
+    const cur = latestOf(p)
+    const all = cur.spots ?? []
+    const byId = new Map(all.map((s) => [s.id, s]))
+    setSpots(cur, [...nextIds.flatMap((id) => byId.get(id) ?? []), ...all.filter((s) => !nextIds.includes(s.id))])
+  }
+  // 편집에서 들를 곳 이름만 고치기 (구글맵 검색어·위치는 그대로)
+  const renameSpot = (p: Plan, spotId: string, title: string) => {
+    const cur = latestOf(p)
+    setSpots(cur, (cur.spots ?? []).map((s) => (s.id === spotId ? { ...s, title } : s)))
+  }
   const removeSpot = async (p: Plan, spotId: string) => {
     const s = latestOf(p).spots?.find((x) => x.id === spotId)
     if (!s || !(await askConfirm({ title: `"${s.title}"을 들를 곳에서 뺄까요?`, confirmLabel: '빼기', danger: true }))) return
@@ -420,6 +432,8 @@ export function PlansTab({ trip, plans, expenses, mine }: { trip: Trip; plans: P
             onToggleExpand={toggleExpand}
             onToggleSpot={toggleSpot}
             onFocusSpot={focusSpot}
+            onReorderSpots={reorderSpots}
+            onRenameSpot={renameSpot}
             onReorder={reorder}
             edges={listEdges}
             onDragChange={(d) => {

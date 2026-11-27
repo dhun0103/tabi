@@ -134,6 +134,16 @@ export function ExternalIcon({ className = 'h-4 w-4' }: { className?: string }) 
   )
 }
 
+/** 이름 고치기 (작은 연필) */
+export function PencilIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
+      <path d="M13.5 8.5l3 3" />
+    </svg>
+  )
+}
+
 /** 빼기 (작은 X) */
 export function XIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
